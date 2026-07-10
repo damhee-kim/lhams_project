@@ -1,5 +1,57 @@
 [
   {
+    "id": 1783671809582,
+    "timestamp": "2026-07-10 17:23:29",
+    "event_type": "DELETED",
+    "file_path": "D:\\dev\\lhams_project\\data\\test_monitor\\replaced_mail.txt",
+    "dest_path": null,
+    "user": "unknown",
+    "owner": "unknown",
+    "process": null,
+    "exe": null,
+    "risk_level": "High",
+    "quarantined": false
+  },
+  {
+    "id": 1783671792242,
+    "timestamp": "2026-07-10 17:23:12",
+    "event_type": "MOVED",
+    "file_path": "D:\\dev\\lhams_project\\data\\test_monitor\\new_mail.txt",
+    "dest_path": "D:\\dev\\lhams_project\\data\\test_monitor\\replaced_mail.txt",
+    "user": "unknown",
+    "owner": "unknown",
+    "process": null,
+    "exe": null,
+    "risk_level": "Medium",
+    "quarantined": false
+  },
+  {
+    "id": 1783671791025,
+    "timestamp": "2026-07-10 17:23:10",
+    "event_type": "MODIFIED",
+    "file_path": "D:\\dev\\lhams_project\\data\\test_monitor\\new_mail.txt",
+    "dest_path": null,
+    "user": "unknown",
+    "owner": "unknown",
+    "process": null,
+    "exe": null,
+    "risk_level": "Low",
+    "quarantined": false
+  },
+  {
+    "id": 1783671790926,
+    "timestamp": "2026-07-10 17:23:10",
+    "event_type": "CREATED",
+    "file_path": "D:\\dev\\lhams_project\\data\\test_monitor\\new_mail.txt",
+    "dest_path": null,
+    "user": "unknown",
+    "owner": "unknown",
+    "process": null,
+    "exe": null,
+    "risk_level": "Low",
+    "quarantined": false
+  },
+  {
     "id": 1783668719819,
     "timestamp": "2026-07-10 16:31:59",
     "event_type": "DELETED",

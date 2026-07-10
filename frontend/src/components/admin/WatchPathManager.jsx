@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Trash2 } from 'lucide-react'
+import { Trash2, FolderTree } from 'lucide-react'
 import Toggle from '../common/Toggle.jsx'
 import ConfirmDialog from '../common/ConfirmDialog.jsx'
 
@@ -28,7 +28,7 @@ export default function WatchPathManager({ paths, onAdd, onToggle, onRemove }) {
 
   return (
     <section className="admin-section">
-      <h2>감시 경로</h2>
+      <h2><FolderTree size={16} /> 감시 경로</h2>
       <p className="admin-hint">등록된 경로는 재시작 없이 즉시 감시가 시작/중지됩니다.</p>
 
       <form className="path-form" onSubmit={submit}>

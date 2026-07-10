@@ -1,5 +1,6 @@
 @use './variables' as *;
 @use './admin';
+@use './summary';
 
 * { box-sizing: border-box; }
 
@@ -70,11 +71,12 @@ body {
 // ── 통계 카드 ─────────────────────────────────────────────
 .stats {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 12px;
   margin-bottom: 20px;
 
-  @media (max-width: 800px) { grid-template-columns: repeat(2, 1fr); }
+  @media (max-width: 980px) { grid-template-columns: repeat(3, 1fr); }
+  @media (max-width: 620px) { grid-template-columns: repeat(2, 1fr); }
 }
 
 .stat-card {
@@ -197,6 +199,32 @@ body {
     color: $text;
     word-break: break-all;
     .dest { color: $muted; }
+  }
+
+  // 파일 교체(MOVED) — 교체 전/후 경로를 명확히 대비
+  .replace-path {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .replace-before, .replace-after {
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+  }
+
+  .replace-before { color: $muted; }
+  .replace-after { color: $text; font-weight: 600; }
+
+  .replace-tag {
+    flex-shrink: 0;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: rgba($warn, .14);
+    color: $warn;
   }
 
   .user { color: #fff; }

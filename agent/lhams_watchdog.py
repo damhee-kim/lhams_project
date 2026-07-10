@@ -678,6 +678,8 @@ def create_api(watch_manager: WatchManager, config_store: ConfigStore, quarantin
 if __name__ == "__main__":
     config_store = ConfigStore(CONFIG_FILE)
     quarantine_store = QuarantineStore(QUARANTINE_META_FILE)
+    checklist_store = ChecklistStore(CHECKLIST_FILE)
+    admin_audit = AdminAuditLog(ADMIN_AUDIT_FILE)
     handler = LhamsAuditHandler(config_store, quarantine_store)
 
     observer = Observer()
@@ -685,7 +687,7 @@ if __name__ == "__main__":
     watch_manager.start_all()
     observer.start()
 
-    api = create_api(watch_manager, config_store, quarantine_store)
+    api = create_api(watch_manager, config_store, quarantine_store, checklist_store, admin_audit)
     api_thread = threading.Thread(
         target=lambda: api.run(host="0.0.0.0", port=API_PORT, threaded=True, use_reloader=False),
         daemon=True,

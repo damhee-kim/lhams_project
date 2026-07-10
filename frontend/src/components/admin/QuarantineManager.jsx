@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { RotateCcw, Trash2 } from 'lucide-react'
+import { RotateCcw, Trash2, ShieldAlert } from 'lucide-react'
 import ConfirmDialog from '../common/ConfirmDialog.jsx'
 
 export default function QuarantineManager({ entries, onRestore, onDelete }) {
@@ -7,7 +7,10 @@ export default function QuarantineManager({ entries, onRestore, onDelete }) {
 
   return (
     <section className="admin-section">
-      <h2>격리소 (Quarantine)</h2>
+      <div className="section-head">
+        <h2><ShieldAlert size={16} /> 격리소 (Quarantine)</h2>
+        {entries.length > 0 && <span className="badge-mini">{entries.length}건</span>}
+      </div>
       <p className="admin-hint">악성코드로 탐지되어 격리된 파일 목록입니다. 오탐인 경우 원래 경로로 복원할 수 있습니다.</p>
 
       <div className="quarantine-list">

@@ -3,6 +3,7 @@ import StatCards from './components/StatCards.jsx'
 import FilterBar from './components/FilterBar.jsx'
 import EventTable from './components/EventTable.jsx'
 import Tabs from './components/Tabs.jsx'
+import SummaryPanel from './components/SummaryPanel.jsx'
 import AdminPanel from './components/admin/AdminPanel.jsx'
 import Toast from './components/common/Toast.jsx'
 
@@ -10,7 +11,7 @@ const POLL_MS = 3000
 const TOAST_MS = 3500
 
 export default function App() {
-  const [tab, setTab] = useState('dashboard')
+  const [tab, setTab] = useState('summary')
   const [events, setEvents] = useState([])
   const [filter, setFilter] = useState('ALL')
   const [query, setQuery] = useState('')
@@ -65,6 +66,7 @@ export default function App() {
   const stats = useMemo(() => ({
     total: events.length,
     created: events.filter(e => e.event_type === 'CREATED').length,
+    moved: events.filter(e => e.event_type === 'MOVED').length,
     deleted: events.filter(e => e.event_type === 'DELETED').length,
     malware: events.filter(e => e.event_type === 'MALWARE_DETECTED').length,
   }), [events])
@@ -90,7 +92,9 @@ export default function App() {
 
       <Tabs active={tab} setActive={setTab} />
 
-      {tab === 'dashboard' ? (
+      {tab === 'summary' && <SummaryPanel events={events} agentDown={error} />}
+
+      {tab === 'dashboard' && (
         <>
           <StatCards stats={stats} />
           <FilterBar filter={filter} setFilter={setFilter}
@@ -102,9 +106,9 @@ export default function App() {
             전체 이력은 /mail/lhams_project/data/logs (일별 로테이션)
           </p>
         </>
-      ) : (
-        <AdminPanel pushToast={pushToast} />
       )}
+
+      {tab === 'admin' && <AdminPanel pushToast={pushToast} />}
 
       <Toast toasts={toasts} />
     </div>

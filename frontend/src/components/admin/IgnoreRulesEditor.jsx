@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { X } from 'lucide-react'
+import { X, Filter } from 'lucide-react'
 
 export default function IgnoreRulesEditor({ suffixes, onChange }) {
   const [input, setInput] = useState('')
@@ -16,7 +16,7 @@ export default function IgnoreRulesEditor({ suffixes, onChange }) {
 
   return (
     <section className="admin-section">
-      <h2>무시할 확장자 / 패턴</h2>
+      <h2><Filter size={16} /> 무시할 확장자 / 패턴</h2>
       <p className="admin-hint">
         파일 경로가 이 목록의 문자열로 끝나면 이벤트를 기록하지 않습니다 (에디터 임시 파일 등).
       </p>
