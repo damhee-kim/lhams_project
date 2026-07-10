@@ -1,0 +1,19 @@
+// LHAMS 디자인 토큰
+// 심야 관제실 톤: 깊은 청회색 잉크 배경 + 위험도 신호색 3단계
+
+$bg:        #0e141b;   // 배경 잉크
+$panel:     #151d26;   // 패널
+$panel-2:   #1a2430;   // 패널 강조
+$line:      #24303c;   // 구분선
+$text:      #c9d4df;   // 본문
+$muted:     #6e7e8e;   // 보조 텍스트
+
+$clean:     #3db88b;   // Low / 정상
+$warn:      #f0a63c;   // Medium
+$high:      #e8734d;   // High
+$critical:  #e8554d;   // Critical / 악성코드
+
+$mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+$sans: 'Pretendard', 'Noto Sans KR', system-ui, sans-serif;
+
+$radius: 6px;

@@ -1,0 +1,239 @@
+@use './variables' as *;
+@use './admin';
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: $bg;
+  color: $text;
+  font: 15px/1.5 $sans;
+  -webkit-font-smoothing: antialiased;
+}
+
+.app {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 28px 24px 64px;
+}
+
+// ── 헤더: 시스템 상태 + 마지막 이벤트 경과 시간 티커 ──────────
+.header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  border-bottom: 1px solid $line;
+  padding-bottom: 18px;
+  margin-bottom: 24px;
+
+  h1 {
+    margin: 0;
+    font: 600 22px/1.2 $mono;
+    letter-spacing: -0.5px;
+    color: #fff;
+
+    span { color: $clean; }
+  }
+
+  .subtitle {
+    margin: 4px 0 0;
+    color: $muted;
+    font-size: 13px;
+  }
+
+  .ticker {
+    text-align: right;
+    font-family: $mono;
+    font-size: 13px;
+    color: $muted;
+
+    .dot {
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: $clean;
+      margin-right: 6px;
+      animation: pulse 2s infinite;
+    }
+    &.stale .dot { background: $warn; animation: none; }
+
+    strong { color: $text; font-weight: 500; }
+  }
+}
+
+@keyframes pulse {
+  0%   { box-shadow: 0 0 0 0 rgba($clean, .45); }
+  70%  { box-shadow: 0 0 0 8px rgba($clean, 0); }
+  100% { box-shadow: 0 0 0 0 rgba($clean, 0); }
+}
+
+// ── 통계 카드 ─────────────────────────────────────────────
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+
+  @media (max-width: 800px) { grid-template-columns: repeat(2, 1fr); }
+}
+
+.stat-card {
+  background: $panel;
+  border: 1px solid $line;
+  border-radius: $radius;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  .icon {
+    width: 36px; height: 36px;
+    border-radius: $radius;
+    display: grid;
+    place-items: center;
+    background: $panel-2;
+    flex-shrink: 0;
+  }
+
+  .label { font-size: 12px; color: $muted; }
+  .value {
+    font: 600 22px/1.1 $mono;
+    color: #fff;
+  }
+
+  &.clean    .icon { color: $clean; }
+  &.warn     .icon { color: $warn; }
+  &.high     .icon { color: $high; }
+  &.critical .icon { color: $critical; }
+  &.critical .value { color: $critical; }
+}
+
+// ── 필터 바 ───────────────────────────────────────────────
+.filter-bar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+
+  button {
+    background: $panel;
+    border: 1px solid $line;
+    color: $muted;
+    font: 500 12px $mono;
+    padding: 6px 14px;
+    border-radius: 99px;
+    cursor: pointer;
+    transition: all .15s;
+
+    &:hover { color: $text; border-color: $muted; }
+    &.active {
+      color: $bg;
+      background: $text;
+      border-color: $text;
+    }
+  }
+
+  input {
+    margin-left: auto;
+    background: $panel;
+    border: 1px solid $line;
+    border-radius: $radius;
+    color: $text;
+    font: 13px $mono;
+    padding: 6px 12px;
+    min-width: 240px;
+
+    &::placeholder { color: $muted; }
+    &:focus { outline: 1px solid $muted; }
+  }
+}
+
+// ── 이벤트 테이블 (시그니처: 위험도 레일) ────────────────────
+.event-table {
+  background: $panel;
+  border: 1px solid $line;
+  border-radius: $radius;
+  overflow: hidden;
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: $mono;
+    font-size: 13px;
+  }
+
+  th {
+    text-align: left;
+    font-weight: 500;
+    font-size: 11px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: $muted;
+    padding: 10px 14px;
+    border-bottom: 1px solid $line;
+    background: $panel-2;
+  }
+
+  td {
+    padding: 10px 14px;
+    border-bottom: 1px solid rgba($line, .55);
+    vertical-align: top;
+  }
+
+  tbody tr {
+    // 위험도 레일: 행 왼쪽 3px 색 띠
+    td:first-child { border-left: 3px solid transparent; }
+
+    &.risk-Low      td:first-child { border-left-color: $clean; }
+    &.risk-Medium   td:first-child { border-left-color: $warn; }
+    &.risk-High     td:first-child { border-left-color: $high; }
+    &.risk-Critical td:first-child { border-left-color: $critical; }
+
+    &.risk-Critical { background: rgba($critical, .06); }
+    &:hover { background: $panel-2; }
+  }
+
+  .path {
+    color: $text;
+    word-break: break-all;
+    .dest { color: $muted; }
+  }
+
+  .user { color: #fff; }
+  .proc { color: $muted; font-size: 12px; }
+  .time { color: $muted; white-space: nowrap; }
+
+  .badge {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+
+    &.CREATED          { color: $clean;    background: rgba($clean, .12); }
+    &.MODIFIED         { color: #7fb3d5;   background: rgba(#7fb3d5, .12); }
+    &.MOVED            { color: $warn;     background: rgba($warn, .12); }
+    &.DELETED          { color: $high;     background: rgba($high, .14); }
+    &.MALWARE_DETECTED { color: $critical; background: rgba($critical, .16); }
+  }
+
+  .quarantined {
+    color: $critical;
+    font-size: 11px;
+  }
+
+  .empty {
+    text-align: center;
+    color: $muted;
+    padding: 48px 0;
+    font-family: $sans;
+  }
+}
+
+.footer-note {
+  margin-top: 14px;
+  color: $muted;
+  font-size: 12px;
+  font-family: $mono;
+}

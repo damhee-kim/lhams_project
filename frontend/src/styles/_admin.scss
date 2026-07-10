@@ -1,0 +1,295 @@
+@use './variables' as *;
+
+// ── 탭 전환 ───────────────────────────────────────────────
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+
+  button {
+    background: transparent;
+    border: 1px solid $line;
+    color: $muted;
+    font: 600 13px $mono;
+    padding: 8px 18px;
+    border-radius: $radius;
+    cursor: pointer;
+    transition: all .15s;
+
+    &:hover { color: $text; }
+    &.active {
+      color: #fff;
+      background: $panel-2;
+      border-color: $muted;
+    }
+  }
+}
+
+// ── 관리자 패널 공통 ──────────────────────────────────────
+.admin-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.admin-section {
+  background: $panel;
+  border: 1px solid $line;
+  border-radius: $radius;
+  padding: 18px 20px;
+
+  h2 {
+    margin: 0 0 4px;
+    font: 600 15px/1.3 $sans;
+    color: #fff;
+  }
+}
+
+.admin-hint {
+  margin: 0 0 14px;
+  color: $muted;
+  font-size: 12px;
+}
+
+.admin-empty {
+  color: $muted;
+  font-size: 13px;
+  padding: 16px 0;
+  text-align: center;
+}
+
+.admin-error {
+  color: $critical;
+  font-size: 12px;
+  margin: -6px 0 12px;
+}
+
+// ── 경로 추가 폼 ──────────────────────────────────────────
+.path-form, .tag-form {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+
+  input[type="text"], input:not([type]) {
+    flex: 1;
+    min-width: 220px;
+    background: $panel-2;
+    border: 1px solid $line;
+    border-radius: $radius;
+    color: $text;
+    font: 13px $mono;
+    padding: 8px 12px;
+
+    &:focus { outline: 1px solid $muted; }
+  }
+}
+
+.recursive-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: $muted;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+button.primary {
+  background: $clean;
+  color: $bg;
+  border: none;
+  font: 600 13px $sans;
+  padding: 8px 16px;
+  border-radius: $radius;
+  cursor: pointer;
+  &:disabled { opacity: .6; cursor: default; }
+}
+
+button.ghost {
+  background: transparent;
+  border: 1px solid $line;
+  color: $text;
+  font: 500 13px $sans;
+  padding: 8px 16px;
+  border-radius: $radius;
+  cursor: pointer;
+}
+
+button.danger {
+  background: $critical;
+  color: #fff;
+  border: none;
+  font: 600 13px $sans;
+  padding: 8px 16px;
+  border-radius: $radius;
+  cursor: pointer;
+}
+
+// ── 경로 목록 ─────────────────────────────────────────────
+.path-list, .quarantine-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.path-row, .quarantine-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: $panel-2;
+  border: 1px solid $line;
+  border-radius: $radius;
+  padding: 10px 14px;
+
+  &.disabled { opacity: .5; }
+}
+
+.path-info, .q-info { flex: 1; min-width: 0; }
+
+.path-text {
+  font: 13px $mono;
+  color: $text;
+  word-break: break-all;
+}
+
+.path-meta { margin-top: 4px; }
+
+.badge-mini {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 99px;
+  color: $muted;
+  background: rgba($muted, .12);
+  &.on { color: $clean; background: rgba($clean, .12); }
+}
+
+.q-file { font: 600 13px $mono; color: $text; }
+.q-meta { margin-top: 4px; font-size: 12px; color: $muted; word-break: break-all; }
+.q-actions { display: flex; gap: 6px; }
+
+.icon-btn {
+  display: grid;
+  place-items: center;
+  width: 32px; height: 32px;
+  background: transparent;
+  border: 1px solid $line;
+  border-radius: $radius;
+  color: $muted;
+  cursor: pointer;
+  transition: all .15s;
+
+  &:hover { color: $text; border-color: $muted; }
+  &.danger:hover { color: $critical; border-color: $critical; }
+}
+
+// ── 무시 규칙 태그 ────────────────────────────────────────
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: $panel-2;
+  border: 1px solid $line;
+  border-radius: 99px;
+  padding: 4px 6px 4px 12px;
+  font: 12px $mono;
+  color: $text;
+}
+
+.tag-remove {
+  display: grid;
+  place-items: center;
+  width: 18px; height: 18px;
+  background: transparent;
+  border: none;
+  color: $muted;
+  cursor: pointer;
+  border-radius: 50%;
+  &:hover { color: $critical; background: rgba($critical, .12); }
+}
+
+// ── 토글 스위치 ───────────────────────────────────────────
+.toggle {
+  flex-shrink: 0;
+  width: 38px; height: 22px;
+  border-radius: 99px;
+  background: $line;
+  border: none;
+  position: relative;
+  cursor: pointer;
+  transition: background .15s;
+
+  .knob {
+    position: absolute;
+    top: 3px; left: 3px;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: $muted;
+    transition: all .15s;
+  }
+
+  &.on {
+    background: rgba($clean, .3);
+    .knob { left: 19px; background: $clean; }
+  }
+}
+
+// ── 확인 모달 ─────────────────────────────────────────────
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(#000, .6);
+  display: grid;
+  place-items: center;
+  z-index: 100;
+}
+
+.modal {
+  background: $panel;
+  border: 1px solid $line;
+  border-radius: $radius;
+  padding: 22px 24px;
+  width: min(380px, 90vw);
+
+  h3 { margin: 0 0 8px; color: #fff; font: 600 16px $sans; }
+  p { margin: 0 0 18px; color: $muted; font-size: 13px; line-height: 1.5; }
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+// ── 토스트 ────────────────────────────────────────────────
+.toast-stack {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 200;
+}
+
+.toast {
+  background: $panel-2;
+  border: 1px solid $line;
+  border-left: 3px solid $clean;
+  border-radius: $radius;
+  padding: 10px 16px;
+  font: 13px $sans;
+  color: $text;
+  box-shadow: 0 4px 16px rgba(#000, .35);
+  min-width: 220px;
+
+  &.error { border-left-color: $critical; }
+}

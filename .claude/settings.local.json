@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p \"d:/dev/lhams_project/data/test_monitor\" \"d:/dev/lhams_project/data/logs\" \"d:/dev/lhams_project/data/quarantine\" && ls -la \"d:/dev/lhams_project/data\")",
+      "Bash(LHAMS_WATCH_DIR=d:/dev/lhams_project/data/test_monitor LHAMS_JSON_LOG=d:/dev/lhams_project/frontend/public/lhams_audit.json LHAMS_TEXT_LOG=d:/dev/lhams_project/data/logs/lhams_audit.log LHAMS_QUARANTINE=d:/dev/lhams_project/data/quarantine python agent/lhams_watchdog.py)",
+      "Bash(python build_pptx.py)",
+      "Bash(python -c ' *)",
+      "Bash(python3 -c ' *)",
+      "Bash(python3 -)",
+      "Bash(\"/c/Program Files/LibreOffice/program/soffice.exe\" --version)",
+      "Bash(\"/c/Program Files \\(x86\\)/Microsoft Office/root/Office16/POWERPNT.EXE\")"
+    ],
+    "additionalDirectories": [
+      "d:\\dev\\lhams_project\\data"
+    ]
+  }
+}

@@ -1,0 +1,10 @@
+# LHAMS auditd 규칙 - /etc/audit/rules.d/lhams.rules
+# 파일 쓰기(w)/속성변경(a) 감시: "누가(Who)" 파일을 교체했는지 커널 레벨 추적
+-w /mail/test_monitor -p wa -k lhams_audit
+
+# 실행(x) 추적: 감시 디렉토리 내 파일을 실행한 프로세스 기록
+-w /mail/test_monitor -p x -k lhams_exec
+
+# execve 시스템 콜 전역 감시 (64/32bit) - 위장 실행 탐지
+-a always,exit -F arch=b64 -S execve -F dir=/mail/test_monitor -k lhams_exec
+-a always,exit -F arch=b32 -S execve -F dir=/mail/test_monitor -k lhams_exec
