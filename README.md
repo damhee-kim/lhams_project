@@ -114,7 +114,3 @@ export LHAMS_API_PORT=8787
 - `.gitignore`에 `node_modules/`, `dist/`, `data/`, `*.log` 필수 등록 (첫 커밋 전)
 - 줄바꿈: `git config --global core.autocrlf input` (사내 표준 LF)
 - 커밋 메시지: 제목 50자 + 본문(변경 이유) + `Refs #WorkItem번호`
-# lhams_project
-# lhams_project
-# lhams_project
-# lhams_project
