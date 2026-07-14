@@ -1,0 +1,1028 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Crinity Insight — 통합 메일 여정 관제 콘솔 프로토타입 (관제 현황·여정 추적·SOS 패키징·경보 설정)">
+<title>Crinity Insight — 통합 메일 여정 관제</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%230B1020'/%3E%3Ccircle cx='7' cy='8' r='2.4' fill='%234C8DFF'/%3E%3Ccircle cx='17' cy='8' r='2.4' fill='%2335C98E'/%3E%3Ccircle cx='12' cy='17' r='2.4' fill='%23F7B32B'/%3E%3Cpath d='M8.7 9.6L11 15.4M15.3 9.6L13 15.4M9.4 8H14.6' stroke='%238A97B5' stroke-width='1.3' fill='none'/%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#0B1020; --panel:#131A2C; --panel2:#0F1526; --line:#223052; --line-soft:#1A2440;
+  --text:#E8EDF7; --muted:#8A97B5; --dim:#56618A;
+  --webmail:#4C8DFF; --spam:#F7B32B; --mailbrk:#FF5D5D; --archive:#35C98E;
+  --pass:#35C98E; --warn:#F7B32B; --crit:#FF5D5D; --pending:#56618A;
+  --mono:"JetBrains Mono","SF Mono",ui-monospace,Consolas,monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  background:var(--bg); color:var(--text);
+  font-family:"Pretendard Variable",Pretendard,"Noto Sans KR",-apple-system,"Malgun Gothic",sans-serif;
+  font-size:14px; letter-spacing:-0.01em;
+  background-image:radial-gradient(1200px 600px at 80% -10%, rgba(76,141,255,.07), transparent 60%);
+}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+input,select{font:inherit;color:var(--text)}
+::selection{background:rgba(76,141,255,.35)}
+
+/* 키보드 포커스 접근성 — 리셋으로 사라진 기본 아웃라인을 브랜드 컬러로 대체 */
+:focus{outline:none}
+:focus-visible{outline:2px solid var(--webmail); outline-offset:2px; border-radius:4px}
+.npick:focus-visible, .fchip:focus-visible, .jrow:focus-visible{outline-offset:0}
+
+/* ===== 레이아웃 ===== */
+.app{display:flex;min-height:100vh}
+.sidebar{
+  width:224px;flex-shrink:0;background:var(--panel2);border-right:1px solid var(--line-soft);
+  display:flex;flex-direction:column;padding:20px 0;position:sticky;top:0;height:100vh;
+}
+.logo{padding:4px 20px 22px;border-bottom:1px solid var(--line-soft)}
+.logo .brand{font-weight:800;font-size:17px;letter-spacing:-.02em}
+.logo .brand b{color:var(--webmail)}
+.logo .sub{font-size:11px;color:var(--muted);margin-top:3px;font-family:var(--mono)}
+.nav{padding:14px 10px;display:flex;flex-direction:column;gap:2px}
+.nav button{
+  display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:9px;
+  color:var(--muted);font-weight:600;font-size:13.5px;text-align:left;transition:.15s;
+}
+.nav button:hover{background:rgba(255,255,255,.04);color:var(--text)}
+.nav button.active{background:rgba(76,141,255,.13);color:#BBD4FF}
+.nav button .dot{width:7px;height:7px;border-radius:50%;background:var(--dim);flex-shrink:0}
+.nav button.active .dot{background:var(--webmail);box-shadow:0 0 8px rgba(76,141,255,.8)}
+.side-foot{margin-top:auto;padding:14px 20px;border-top:1px solid var(--line-soft);font-size:11.5px;color:var(--dim);line-height:1.7}
+.side-foot .role{display:inline-block;padding:2px 8px;border-radius:20px;background:rgba(53,201,142,.12);color:var(--archive);font-weight:700;font-size:11px}
+
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.topbar{
+  display:flex;align-items:center;gap:14px;padding:14px 26px;border-bottom:1px solid var(--line-soft);
+  background:rgba(11,16,32,.8);backdrop-filter:blur(8px);position:sticky;top:0;z-index:20;
+}
+.topbar h1{font-size:16px;font-weight:800}
+.env{font-size:11px;font-family:var(--mono);padding:3px 9px;border-radius:6px;background:rgba(247,179,43,.12);color:var(--warn);border:1px solid rgba(247,179,43,.3)}
+.top-right{margin-left:auto;display:flex;align-items:center;gap:16px;font-size:12.5px;color:var(--muted)}
+.live{display:flex;align-items:center;gap:7px}
+.live .pulse{width:8px;height:8px;border-radius:50%;background:var(--pass);animation:pulse 1.6s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(53,201,142,.5)}70%{box-shadow:0 0 0 8px rgba(53,201,142,0)}100%{box-shadow:0 0 0 0 rgba(53,201,142,0)}}
+.clock{font-family:var(--mono)}
+.content{padding:24px 26px 60px;max-width:1240px;width:100%;margin:0 auto}
+.view{display:none}
+.view.active{display:block;animation:fade .25s ease}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+/* ===== 공통 컴포넌트 ===== */
+.card{background:var(--panel);border:1px solid var(--line-soft);border-radius:14px;padding:18px 20px}
+.card h3{font-size:13px;font-weight:700;color:var(--muted);margin-bottom:14px;letter-spacing:.02em}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.grid2{display:grid;grid-template-columns:1.6fr 1fr;gap:14px}
+.section-gap{margin-top:14px}
+.chip{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:11.5px;font-weight:700}
+.chip.pass{background:rgba(53,201,142,.13);color:var(--pass)}
+.chip.crit{background:rgba(255,93,93,.13);color:var(--crit)}
+.chip.warn{background:rgba(247,179,43,.13);color:var(--warn)}
+.chip.pending{background:rgba(86,97,138,.18);color:#93A0C4}
+.chip.info{background:rgba(76,141,255,.13);color:var(--webmail)}
+.mono{font-family:var(--mono);font-size:12px}
+.btn{
+  padding:9px 16px;border-radius:9px;font-weight:700;font-size:13px;transition:.15s;
+  background:var(--webmail);color:#fff;
+}
+.btn:hover{filter:brightness(1.12)}
+.btn.ghost{background:rgba(255,255,255,.05);color:var(--text);border:1px solid var(--line)}
+.btn.danger{background:var(--crit)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.hint{font-size:12px;color:var(--dim);line-height:1.7}
+
+/* ===== SCR-01 관제 현황 ===== */
+.node-card{position:relative;overflow:hidden}
+.node-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--nc)}
+.node-card .name{font-weight:800;font-size:14.5px;display:flex;align-items:center;gap:8px}
+.node-card .name .st{margin-left:auto}
+.node-card .host{font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:2px}
+.gauges{margin-top:14px;display:flex;flex-direction:column;gap:9px}
+.gauge{display:grid;grid-template-columns:44px 1fr 44px;align-items:center;gap:10px;font-size:11.5px}
+.gauge .lbl{color:var(--muted);font-family:var(--mono)}
+.gauge .val{text-align:right;font-family:var(--mono);color:var(--text)}
+.bar{height:6px;border-radius:4px;background:var(--line-soft);overflow:hidden}
+.bar i{display:block;height:100%;border-radius:4px;background:var(--nc);transition:width .8s ease}
+.bar i.hot{background:var(--crit)!important}
+.bar i.warm{background:var(--warn)!important}
+.queue-line{margin-top:12px;display:flex;justify-content:space-between;align-items:baseline;border-top:1px dashed var(--line-soft);padding-top:10px}
+.queue-line .q{font-family:var(--mono);font-size:18px;font-weight:700}
+.queue-line .q.warm{color:var(--warn)} .queue-line .q.hot{color:var(--crit)}
+
+.chart{display:flex;align-items:flex-end;gap:5px;height:120px;padding-top:6px}
+.chart .col{flex:1;display:flex;flex-direction:column;justify-content:flex-end;gap:2px;height:100%}
+.chart .b{border-radius:3px 3px 0 0;background:linear-gradient(180deg,var(--webmail),rgba(76,141,255,.25));min-height:3px}
+.chart .b.blk{background:linear-gradient(180deg,var(--crit),rgba(255,93,93,.2))}
+.chart-x{display:flex;gap:5px;margin-top:6px}
+.chart-x span{flex:1;text-align:center;font-size:9.5px;color:var(--dim);font-family:var(--mono)}
+.legend{display:flex;gap:16px;font-size:11.5px;color:var(--muted);margin-top:10px}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+
+.feed{display:flex;flex-direction:column;gap:8px;max-height:300px;overflow-y:auto}
+.feed-item{display:flex;gap:10px;padding:10px 12px;border-radius:10px;background:var(--panel2);border:1px solid var(--line-soft);font-size:12.5px;line-height:1.55;animation:fade .3s}
+.feed-item .sev{width:8px;height:8px;border-radius:50%;margin-top:5px;flex-shrink:0}
+.feed-item .t{color:var(--dim);font-family:var(--mono);font-size:11px}
+
+/* ===== SCR-02 여정 추적 ===== */
+.searchbar{display:flex;gap:10px;align-items:center}
+.searchbar input[type=text]{
+  flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:10px;
+  padding:11px 14px;font-size:13.5px;outline:none;transition:.15s;
+}
+.searchbar input[type=text]:focus{border-color:var(--webmail);box-shadow:0 0 0 3px rgba(76,141,255,.15)}
+.filters{display:flex;gap:8px;margin-top:12px}
+.fchip{padding:6px 13px;border-radius:20px;font-size:12px;font-weight:700;color:var(--muted);border:1px solid var(--line);transition:.15s}
+.fchip:hover{color:var(--text)}
+.fchip.on{background:rgba(76,141,255,.14);border-color:rgba(76,141,255,.5);color:#BBD4FF}
+.jlist{margin-top:14px;display:flex;flex-direction:column;gap:8px}
+.jrow{
+  display:grid;grid-template-columns:110px 1fr 200px 130px;gap:14px;align-items:center;
+  padding:13px 16px;border-radius:11px;background:var(--panel);border:1px solid var(--line-soft);
+  cursor:pointer;transition:.15s;text-align:left;width:100%;
+}
+.jrow:hover{border-color:var(--line);background:#17203A}
+.jrow.sel{border-color:rgba(76,141,255,.6);background:rgba(76,141,255,.08)}
+.jrow .subj{font-weight:700;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.jrow .from{font-size:11.5px;color:var(--muted);font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px}
+.jrow .mini-line{display:flex;align-items:center;gap:0}
+.jrow .mini-line .md{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.jrow .mini-line .ms{height:2px;width:16px;flex-shrink:0}
+.jrow .time{font-family:var(--mono);font-size:11px;color:var(--dim);text-align:right}
+.empty{padding:40px;text-align:center;color:var(--dim)}
+
+/* --- 시그니처: 노드별 타임라인 --- */
+.journey-detail{margin-top:16px}
+.jd-head{display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap}
+.jd-head .subj{font-size:16px;font-weight:800}
+.jd-meta{display:grid;grid-template-columns:repeat(4,auto);gap:6px 28px;margin-top:12px;font-size:12.5px}
+.jd-meta .k{color:var(--dim);font-size:11px;margin-bottom:2px}
+.jd-meta .v{font-family:var(--mono);font-size:12px}
+.transit{margin-top:26px;padding:30px 10px 10px;overflow-x:auto}
+.t-line{display:flex;align-items:flex-start;min-width:760px}
+.station{display:flex;flex-direction:column;align-items:center;width:150px;flex-shrink:0;position:relative}
+.station .s-dot{
+  width:22px;height:22px;border-radius:50%;border:4px solid var(--sc);background:var(--bg);
+  position:relative;z-index:2;transition:.3s;
+}
+.station.reached .s-dot{background:var(--sc);box-shadow:0 0 14px color-mix(in srgb,var(--sc) 60%,transparent)}
+.station.blocked .s-dot{background:var(--crit);border-color:var(--crit);animation:blockPulse 1.4s infinite}
+@keyframes blockPulse{0%{box-shadow:0 0 0 0 rgba(255,93,93,.55)}70%{box-shadow:0 0 0 12px rgba(255,93,93,0)}100%{box-shadow:0 0 0 0 rgba(255,93,93,0)}}
+.station.pending .s-dot{border-color:var(--dim);border-style:dashed}
+.station .s-name{margin-top:10px;font-weight:800;font-size:13px}
+.station.pending .s-name{color:var(--dim)}
+.station .s-time{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-top:3px}
+.station .s-detail{font-size:11px;color:var(--muted);margin-top:5px;text-align:center;line-height:1.5;max-width:140px}
+.station.blocked .s-detail{color:#FFB4B4}
+.segment{flex:1;min-width:60px;height:22px;display:flex;align-items:center;position:relative;margin:0 -32px}
+.segment .track{height:6px;width:100%;border-radius:3px;background:linear-gradient(90deg,var(--c1),var(--c2))}
+.segment.dead .track{background:repeating-linear-gradient(90deg,var(--line) 0 8px,transparent 8px 16px);height:3px}
+.segment .lat{
+  position:absolute;top:-24px;left:50%;transform:translateX(-50%);
+  font-family:var(--mono);font-size:10.5px;padding:2px 8px;border-radius:10px;
+  background:var(--panel2);border:1px solid var(--line);color:var(--muted);white-space:nowrap;
+}
+.segment .lat.slow{color:var(--warn);border-color:rgba(247,179,43,.4)}
+.reason-card{
+  margin-top:18px;padding:16px 18px;border-radius:12px;display:flex;gap:14px;align-items:flex-start;
+  background:rgba(255,93,93,.07);border:1px solid rgba(255,93,93,.25);
+}
+.reason-card.ok{background:rgba(53,201,142,.06);border-color:rgba(53,201,142,.25)}
+.reason-card.warn{background:rgba(247,179,43,.07);border-color:rgba(247,179,43,.3)}
+.reason-card .rc-body{flex:1}
+.reason-card .rc-title{font-weight:800;font-size:13.5px;margin-bottom:4px}
+.reason-card .rc-desc{font-size:12.5px;color:var(--muted);line-height:1.65}
+
+/* ===== SCR-03 SOS ===== */
+.sos-form{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.field label{display:block;font-size:11.5px;color:var(--muted);font-weight:700;margin-bottom:7px}
+.field input[type=datetime-local]{
+  width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:10px 12px;outline:none;color-scheme:dark;
+}
+.node-picks{display:flex;gap:10px;flex-wrap:wrap}
+.npick{display:flex;align-items:center;gap:8px;padding:9px 14px;border-radius:9px;border:1px solid var(--line);font-size:12.5px;font-weight:700;color:var(--muted);transition:.15s}
+.npick .nd{width:9px;height:9px;border-radius:50%}
+.npick.on{border-color:rgba(76,141,255,.5);background:rgba(76,141,255,.09);color:var(--text)}
+.sos-steps{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:16px}
+.sos-node{border:1px solid var(--line-soft);border-radius:12px;padding:14px;background:var(--panel2)}
+.sos-node .nn{font-weight:800;font-size:13px;display:flex;align-items:center;gap:8px}
+.sos-node ul{list-style:none;margin-top:12px;display:flex;flex-direction:column;gap:7px}
+.sos-node li{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--dim);font-family:var(--mono)}
+.sos-node li .ic{width:15px;height:15px;border-radius:50%;border:2px solid var(--line);flex-shrink:0;display:grid;place-items:center;font-size:9px}
+.sos-node li.doing{color:var(--warn)} .sos-node li.doing .ic{border-color:var(--warn);animation:spinB 1s linear infinite}
+@keyframes spinB{to{transform:rotate(360deg)}}
+.sos-node li.done{color:var(--pass)} .sos-node li.done .ic{border-color:var(--pass);background:rgba(53,201,142,.15)}
+.sos-node li.done .ic::after{content:"✓"}
+.sos-result{margin-top:16px;display:none;align-items:center;gap:16px;padding:16px 18px;border-radius:12px;background:rgba(53,201,142,.07);border:1px solid rgba(53,201,142,.3)}
+.sos-result.show{display:flex;animation:fade .3s}
+.sos-result .fn{font-family:var(--mono);font-size:13px;font-weight:700}
+.sos-result .fs{font-size:11.5px;color:var(--muted);margin-top:3px}
+.timer{font-family:var(--mono);font-size:12px;color:var(--warn)}
+
+/* ===== SCR-04 경보 ===== */
+.th-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.th-item label{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);font-weight:700;margin-bottom:8px}
+.th-item label b{font-family:var(--mono);color:var(--text)}
+.th-item input[type=range]{width:100%;accent-color:var(--webmail)}
+.webhook-row{display:flex;gap:10px;margin-top:6px}
+.webhook-row input{flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:10px 12px;outline:none;font-family:var(--mono);font-size:12px}
+table.alert-table{width:100%;border-collapse:collapse;font-size:12.5px}
+table.alert-table th{color:var(--dim);font-weight:700;text-align:left;padding:8px 10px;border-bottom:1px solid var(--line-soft);font-size:11.5px}
+table.alert-table td{padding:10px;border-bottom:1px solid var(--line-soft)}
+table.alert-table td.mono{font-size:11.5px}
+
+/* ===== SCR-05 아키텍처 ===== */
+.arch-wrap{overflow-x:auto}
+.arch-svg{min-width:820px;width:100%}
+
+/* 토스트 */
+#toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%);z-index:99;display:flex;flex-direction:column;gap:8px;align-items:center}
+.toast-item{padding:11px 20px;border-radius:11px;background:#1B2440;border:1px solid var(--line);font-size:13px;font-weight:600;box-shadow:0 10px 30px rgba(0,0,0,.45);animation:fade .25s}
+.toast-item.ok{border-color:rgba(53,201,142,.5)} .toast-item.err{border-color:rgba(255,93,93,.5)}
+
+@media (max-width:1000px){
+  .grid4{grid-template-columns:repeat(2,1fr)} .grid2{grid-template-columns:1fr}
+  .sos-steps{grid-template-columns:repeat(2,1fr)} .th-grid{grid-template-columns:1fr}
+  .sidebar{width:70px} .logo .brand,.logo .sub,.nav button span.lb,.side-foot{display:none}
+  .jrow{grid-template-columns:1fr 130px}
+  .jrow .mini-line,.jrow .time{display:none}
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="brand">Crinity <b>Insight</b></div>
+      <div class="sub">Meta Control Tower v1.0</div>
+    </div>
+    <nav class="nav" id="nav">
+      <button data-view="overview" class="active" type="button"><i class="dot"></i><span class="lb">관제 현황</span></button>
+      <button data-view="journey" type="button"><i class="dot"></i><span class="lb">메일 여정 추적</span></button>
+      <button data-view="sos" type="button"><i class="dot"></i><span class="lb">SOS 로그 패키징</span></button>
+      <button data-view="alert" type="button"><i class="dot"></i><span class="lb">여정 경보 설정</span></button>
+      <button data-view="arch" type="button"><i class="dot"></i><span class="lb">시스템 아키텍처</span></button>
+      <button data-view="dev" type="button"><i class="dot"></i><span class="lb">개발 가이드</span></button>
+    </nav>
+    <div class="side-foot">
+      접속 계정 <span class="role">ENGINEER</span><br>
+      admin.kim@crinity.com<br>
+      <span style="font-family:var(--mono)">RBAC: 조치 권한 보유</span>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <h1 id="viewTitle">관제 현황</h1>
+      <span class="env">PROTOTYPE · MOCK DATA</span>
+      <span class="env" style="background:rgba(76,141,255,.10);color:var(--webmail);border-color:rgba(76,141,255,.3)">CUSTOMER: K-Enterprise · 내부망</span>
+      <div class="top-right">
+        <div class="live"><i class="pulse"></i>Edge Agent 4/4 연결 · 3초 폴링</div>
+        <div class="clock" id="clock" aria-live="off">--:--:--</div>
+      </div>
+    </div>
+    <div class="content" id="content"></div>
+  </div>
+</div>
+<div id="toast" aria-live="polite"></div>
+<script>
+/* ─────────────────────────────────────────────────────────────────────────
+ * Crinity Insight — 관리자 대시보드 프로토타입 (v1.2, 세미나 데모용)
+ * ─────────────────────────────────────────────────────────────────────────
+ * 목적   : UI/UX·데이터 흐름 검증용 단일 파일 프로토타입 (외부 의존성 0건)
+ * 이력   : 분석·설계·요구사항 정의서 v1.0 / 핵심기능 상세명세 v1.1 / 구현착수 전 보안명세 v1.2
+ *
+ * [코드 목차]  ── Ctrl+F로 "§" 검색하여 섹션 이동
+ *   §1 DATA    목업 데이터 (실구현 시 FastAPI 응답으로 대체되는 형태 그대로 정의)
+ *   §2 UTIL    DOM 헬퍼·상태 칩·토스트
+ *   §3 SCR-01  관제 현황   (FR-07/10) — 헬스 카드·처리량 차트·경보 피드
+ *   §4 SCR-02  여정 추적    (FR-01~04) — 검색·노드별 타임라인·격리 해제
+ *   §5 SCR-03  SOS 패키징   (FR-05/06) — 병렬 진행 시뮬레이션·manifest 다운로드
+ *   §6 SCR-04  여정 경보   (FR-08~10) — 임계치·Webhook·이력
+ *   §7 SCR-05  아키텍처    — 3-Tier SVG (문서·발표용, 실구현 시 유지)
+ *   §8 SCR-06  개발 가이드 — 화면→스펙→API 매핑, MOCK 목록, React 이관 구조
+ *   §9 BOOT    내비게이션·시계·라이브 시뮬레이션 타이머
+ *
+ * [MOCK → 실구현 전환 포인트 요약]  ※ 상세는 §8 개발 가이드 화면 참조
+ *   · JOURNEYS/health 상수      → GET /api/v1/journeys, /health (3초 폴링)
+ *   · setInterval 지표 랜덤 변동 → Agent 10초 수집분 반영
+ *   · runSos() 랜덤 진행률        → job 상태 머신 + SSE(EventSource)
+ *   · releaseBtn 토스트          → POST /api/v1/nodes/release + RBAC + 감사 기록
+ *   · 역할 하드코딩(ENGINEER)    → 로그인 세션 + 서버측 RBAC
+ *
+ * [컨벤션] 뷰는 views[뷰id]() 함수가 #content를 replaceChildren으로 갱신.
+ *          렌더 함수는 render* 접두사, 목업 상태는 파일 상단 let 변수로 유지.
+ * ───────────────────────────────────────────────────────────────────────── */
+/* §1 DATA ──────────────────────────────────────────────────────────────
+ * 목업 데이터. 필드명·구조는 설계서 §4.3 데이터 스키마와 1:1 — 실구현 시
+ * 이 상수들을 fetch 응답으로 치환하면 렌더 계층은 수정 없이 동작한다.
+ * MOCK: 전부 하드코딩 / REAL: GET /api/v1/journeys, /health, /alerts */
+const NODES = [
+  {id:"Webmail",     name:"웹메일",     host:"10.10.1.11", color:"var(--webmail)", hex:"#4C8DFF"},
+  {id:"SpamBreaker", name:"스팸브레이커", host:"10.10.1.12", color:"var(--spam)",    hex:"#F7B32B"},
+  {id:"MailBreaker", name:"메일브레이커", host:"10.10.1.13", color:"var(--mailbrk)", hex:"#FF5D5D"},
+  {id:"Archiving",   name:"아카이빙",   host:"10.10.1.14", color:"var(--archive)", hex:"#35C98E"},
+];
+const nodeById = id => NODES.find(n=>n.id===id);
+
+let health = {
+  Webmail:     {cpu:23, mem:61, disk:72, queue:12},
+  SpamBreaker: {cpu:41, mem:55, disk:68, queue:1024},
+  MailBreaker: {cpu:37, mem:70, disk:91, queue:88},
+  Archiving:   {cpu:12, mem:48, disk:83, queue:5},
+};
+
+const JOURNEYS = [
+ {message_id:"<20260713.143005.a1@crinity.com>", meta:{sender:"client@external.com", recipient:"user@crinity.com", subject:"프로젝트 산출물 전달의 건", received_at:"2026-07-13 14:30:00"},
+  state:"QUARANTINED",
+  nodes:[
+   {node:"Webmail",status:"PASS",time:"14:30:01",latency:0,detail:"SMTP 250 OK"},
+   {node:"SpamBreaker",status:"PASS",time:"14:30:03",latency:2000,detail:"Spam Score: 0.1"},
+   {node:"MailBreaker",status:"QUARANTINED",time:"14:30:05",latency:2000,detail:"DLP 룰 매칭 — 주민등록번호 패턴 검출"},
+   {node:"Archiving",status:"PENDING"}]},
+ {message_id:"<20260713.141812.b7@crinity.com>", meta:{sender:"partner@vendor.co.kr", recipient:"sales@crinity.com", subject:"7월 정기 견적서 송부", received_at:"2026-07-13 14:18:10"},
+  state:"ARCHIVED",
+  nodes:[
+   {node:"Webmail",status:"PASS",time:"14:18:11",latency:0,detail:"SMTP 250 OK"},
+   {node:"SpamBreaker",status:"PASS",time:"14:18:12",latency:1000,detail:"Spam Score: 0.0"},
+   {node:"MailBreaker",status:"PASS",time:"14:18:13",latency:1000,detail:"DLP 정책 통과"},
+   {node:"Archiving",status:"PASS",time:"14:18:14",latency:1000,detail:"WORM 스토리지 보관 완료"}]},
+ {message_id:"<20260713.135944.c2@crinity.com>", meta:{sender:"promo@unknown-shop.biz", recipient:"user@crinity.com", subject:"(광고) 최대 90% 특가 이벤트", received_at:"2026-07-13 13:59:40"},
+  state:"QUARANTINED",
+  nodes:[
+   {node:"Webmail",status:"PASS",time:"13:59:41",latency:0,detail:"SMTP 250 OK"},
+   {node:"SpamBreaker",status:"QUARANTINED",time:"13:59:43",latency:2000,detail:"Spam Score: 9.8 — RBL 등재 발신 IP"},
+   {node:"MailBreaker",status:"PENDING"},{node:"Archiving",status:"PENDING"}]},
+ {message_id:"<20260713.133150.d9@crinity.com>", meta:{sender:"hr@crinity.com", recipient:"all@crinity.com", subject:"[전사공지] 하반기 워크숍 일정조사", received_at:"2026-07-13 13:31:48"},
+  state:"DELAYED",
+  nodes:[
+   {node:"Webmail",status:"PASS",time:"13:31:49",latency:0,detail:"SMTP 250 OK"},
+   {node:"SpamBreaker",status:"DELAYED",time:"13:31:51",latency:2000,detail:"대기열 정체 감지 — Timeout 엔진 처리 지연 (대기 1,024건)"},
+   {node:"MailBreaker",status:"PENDING"},{node:"Archiving",status:"PENDING"}]},
+ {message_id:"<20260713.131022.e4@crinity.com>", meta:{sender:"dev@opensource.org", recipient:"cto@crinity.com", subject:"Re: 라이선스 검토 요청", received_at:"2026-07-13 13:10:20"},
+  state:"ARCHIVED",
+  nodes:[
+   {node:"Webmail",status:"PASS",time:"13:10:21",latency:0,detail:"SMTP 250 OK"},
+   {node:"SpamBreaker",status:"PASS",time:"13:10:22",latency:1000,detail:"Spam Score: 0.3"},
+   {node:"MailBreaker",status:"PASS",time:"13:10:23",latency:1000,detail:"DLP 정책 통과"},
+   {node:"Archiving",status:"PASS",time:"13:10:25",latency:2000,detail:"WORM 스토리지 보관 완료"}]},
+ {message_id:"<20260713.124533.f6@crinity.com>", meta:{sender:"finance@crinity.com", recipient:"bank@partner.com", subject:"6월 결산 자료 첨부", received_at:"2026-07-13 12:45:30"},
+  state:"QUARANTINED",
+  nodes:[
+   {node:"Webmail",status:"PASS",time:"12:45:31",latency:0,detail:"SMTP 250 OK"},
+   {node:"SpamBreaker",status:"PASS",time:"12:45:32",latency:1000,detail:"Spam Score: 0.0"},
+   {node:"MailBreaker",status:"QUARANTINED",time:"12:45:34",latency:2000,detail:"첨부파일 정책 위반 — 암호화되지 않은 .xlsx 외부 발송"},
+   {node:"Archiving",status:"PENDING"}]},
+ {message_id:"<20260713.121408.g3@crinity.com>", meta:{sender:"support@crinity.com", recipient:"vip@customer.co.kr", subject:"장애 조치 완료 보고", received_at:"2026-07-13 12:14:05"},
+  state:"ARCHIVED",
+  nodes:[
+   {node:"Webmail",status:"PASS",time:"12:14:06",latency:0,detail:"SMTP 250 OK"},
+   {node:"SpamBreaker",status:"PASS",time:"12:14:07",latency:1000,detail:"Spam Score: 0.1"},
+   {node:"MailBreaker",status:"PASS",time:"12:14:08",latency:1000,detail:"DLP 정책 통과"},
+   {node:"Archiving",status:"PASS",time:"12:14:09",latency:1000,detail:"WORM 스토리지 보관 완료"}]},
+];
+
+let alerts = [
+ {t:"14:29:52", node:"MailBreaker", sev:"CRITICAL", msg:"디스크 사용률 91% — 임계치(90%) 초과", ch:"Slack #ops-alert"},
+ {t:"14:28:10", node:"SpamBreaker", sev:"WARNING",  msg:"메일 큐 1,024건 대기 — 임계치(1,000건) 초과", ch:"Slack #ops-alert"},
+ {t:"13:31:51", node:"SpamBreaker", sev:"WARNING",  msg:"Timeout 엔진: 다음 노드 미도달 여정 3건 감지", ch:"Teams 운영채널"},
+ {t:"11:02:33", node:"Archiving",   sev:"INFO",     msg:"디스크 사용률 83% — 주의 구간 진입", ch:"대시보드"},
+];
+
+/* §2 UTIL ──────────────────────────────────────────────────────────────
+ * DOM 헬퍼($/el), 상태 칩(stateChip), 토스트. 실구현 React 이관 시
+ * stateChip → <StateChip/>, toast → 전역 Toast 컨텍스트로 대체. */
+const $ = s => document.querySelector(s);
+const el = (tag, cls, html) => {const e=document.createElement(tag); if(cls)e.className=cls; if(html!=null)e.innerHTML=html; return e;};
+const stateChip = s => ({
+  ARCHIVED:'<span class="chip pass">보관 완료</span>', PASS:'<span class="chip pass">통과</span>',
+  QUARANTINED:'<span class="chip crit">격리됨</span>', DELAYED:'<span class="chip warn">지연</span>',
+  PENDING:'<span class="chip pending">미도달</span>', RELEASED:'<span class="chip info">해제됨</span>',
+}[s]||s);
+function toast(msg, kind){ const t=el('div','toast-item '+(kind||''), msg); $('#toast').appendChild(t); setTimeout(()=>t.remove(), 3200); }
+function sevColor(s){return s==='CRITICAL'?'var(--crit)':s==='WARNING'?'var(--warn)':'var(--webmail)';}
+
+/* ================= 뷰 렌더링 ================= */
+const content = $('#content');
+const VIEW_TITLES = {overview:"관제 현황", journey:"메일 여정 추적", sos:"SOS 로그 패키징", alert:"여정 경보 설정", arch:"시스템 아키텍처 (3-Tier)", dev:"개발 가이드 (프로토타입 → 실구현)"};
+const views = {};
+
+/* §3 SCR-01 관제 현황 ───────────────────────────────────────── FR-07, FR-10
+ * MOCK: health 상수 + §9의 3초 랜덤 변동 /  REAL: GET /api/v1/health 폴링
+ * 접근 메모: Heartbeat 대신 노드별 카드 표시 + "통신 두절" 배지 (보안명세 §1) */
+views.overview = () => {
+  const v = el('div','view active');
+  v.innerHTML = `
+    <div class="grid4" id="healthCards"></div>
+    <div class="grid2 section-gap">
+      <div class="card">
+        <h3>24시간 메일 처리량 · 차단 현황 (FR-07)</h3>
+        <div class="chart" id="thruChart"></div>
+        <div class="chart-x" id="thruX"></div>
+        <div class="legend">
+          <span><i style="background:var(--webmail)"></i>정상 처리</span>
+          <span><i style="background:var(--crit)"></i>격리/차단</span>
+        </div>
+      </div>
+      <div class="card">
+        <h3>실시간 경보 피드 (FR-08 · Slack/Teams 연동)</h3>
+        <div class="feed" id="alertFeed"></div>
+      </div>
+    </div>`;
+  content.replaceChildren(v);
+  renderHealth(); renderChart(); renderFeed();
+};
+
+function renderHealth(){
+  const wrap = $('#healthCards'); if(!wrap) return;
+  wrap.replaceChildren(...NODES.map(n=>{
+    const h = health[n.id];
+    const cls = p => p>=90?'hot':p>=80?'warm':'';
+    const qcls = h.queue>=1000?'hot':h.queue>=500?'warm':'';
+    const card = el('div','card node-card');
+    card.style.setProperty('--nc', n.color);
+    card.innerHTML = `
+      <div class="name">${n.name}<span class="st">${h.disk>=90||h.queue>=1000?'<span class="chip crit">경보</span>':h.disk>=80?'<span class="chip warn">주의</span>':'<span class="chip pass">정상</span>'}</span></div>
+      <div class="host">${n.id} · ${n.host}</div>
+      <div class="gauges">
+        ${[['CPU',h.cpu],['MEM',h.mem],['DISK',h.disk]].map(([k,p])=>`
+          <div class="gauge"><span class="lbl">${k}</span>
+            <div class="bar"><i class="${cls(p)}" style="width:${p}%"></i></div>
+            <span class="val">${p}%</span></div>`).join('')}
+      </div>
+      <div class="queue-line"><span class="hint">메일 큐 대기</span><span class="q ${qcls}">${h.queue.toLocaleString()}<small style="font-size:11px;color:var(--dim)"> 건</small></span></div>`;
+    return card;
+  }));
+}
+
+function renderChart(){
+  const c = $('#thruChart'), x=$('#thruX'); if(!c) return;
+  const data = [42,38,30,22,18,15,20,35,62,78,85,92,88,95,90,84,80,76,70,66,58,52,48,45];
+  const blk  = [ 3, 2, 2, 1, 1, 1, 1, 3, 6,  8, 9, 12, 9, 14, 10, 8, 7, 6, 5, 5, 4, 3, 3, 3];
+  c.replaceChildren(...data.map((d,i)=>{
+    const col = el('div','col');
+    col.innerHTML = `<div class="b blk" style="height:${blk[i]}%"></div><div class="b" style="height:${d}%"></div>`;
+    col.title = `${i}시 — 처리 ${d*47}건 / 격리 ${blk[i]*47}건`;
+    return col;
+  }));
+  x.replaceChildren(...data.map((_,i)=> el('span',null, i%4===0? String(i).padStart(2,'0') : '')));
+}
+
+function renderFeed(){
+  const f = $('#alertFeed'); if(!f) return;
+  f.replaceChildren(...alerts.map(a=>{
+    const it = el('div','feed-item');
+    it.innerHTML = `<i class="sev" style="background:${sevColor(a.sev)}"></i>
+      <div><b>[${a.sev}] ${nodeById(a.node)?.name||a.node}</b> — ${a.msg}
+      <div class="t">${a.t} · 발송: ${a.ch}</div></div>`;
+    return it;
+  }));
+}
+
+/* §4 SCR-02 여정 추적 ────────────────────────────────────── FR-01~04, FR-11
+ * MOCK: JOURNEYS 상수 필터링  /  REAL: GET /journeys?keyword=&status=&cursor=
+ * 시그니처 UI: renderJDetail()의 노드별 타임라인(.transit) — 역/구간/지연 배지
+ * 접근 메모: 노드 4개 고정 가정 금지, NODES 배열 기반 N개 일반화 유지(NFR-06)
+ *           격리 해제는 확인 모달+사유 입력 필수, 서버측 RBAC (보안명세 §5.1) */
+let jFilter = 'ALL', jKeyword = '', selectedJourney = JOURNEYS[0];
+views.journey = () => {
+  const v = el('div','view active');
+  v.innerHTML = `
+    <div class="card">
+      <div class="searchbar">
+        <input type="text" id="jSearch" placeholder="Message-ID, 발신자, 수신자, 제목 키워드로 검색 (GET /api/v1/journeys?keyword=)" value="${jKeyword}">
+        <button class="btn" id="jSearchBtn" type="button">여정 검색</button>
+      </div>
+      <div class="filters" id="jFilters">
+        ${[['ALL','전체'],['QUARANTINED','격리'],['DELAYED','지연'],['ARCHIVED','정상 보관']].map(([k,l])=>
+          `<button class="fchip ${jFilter===k?'on':''}" data-f="${k}" type="button">${l}</button>`).join('')}
+      </div>
+      <div class="jlist" id="jList"></div>
+    </div>
+    <div class="card journey-detail" id="jDetail"></div>`;
+  content.replaceChildren(v);
+  $('#jSearchBtn').onclick = ()=>{ jKeyword=$('#jSearch').value.trim(); renderJList(); };
+  $('#jSearch').addEventListener('keydown', e=>{ if(e.key==='Enter'){ jKeyword=e.target.value.trim(); renderJList(); }});
+  $('#jFilters').querySelectorAll('.fchip').forEach(b=> b.onclick=()=>{ jFilter=b.dataset.f; views.journey(); });
+  renderJList(); renderJDetail();
+};
+
+function journeyMatches(j){
+  if(jFilter!=='ALL' && j.state!==jFilter && !(jFilter==='QUARANTINED'&&j.state==='RELEASED')) return false;
+  if(!jKeyword) return true;
+  const k = jKeyword.toLowerCase();
+  return [j.message_id, j.meta.sender, j.meta.recipient, j.meta.subject].some(s=>s.toLowerCase().includes(k));
+}
+
+function miniLine(j){
+  return `<div class="mini-line">${j.nodes.map((s,i)=>{
+    const n=nodeById(s.node);
+    const c = s.status==='PENDING' ? 'var(--line)' : s.status==='QUARANTINED' ? 'var(--crit)' : s.status==='DELAYED' ? 'var(--warn)' : n.color;
+    const seg = i<j.nodes.length-1 ? `<i class="ms" style="background:${s.status==='PENDING'?'var(--line-soft)':c}"></i>` : '';
+    return `<i class="md" style="background:${c};${s.status==='PENDING'?'opacity:.35':''}"></i>${seg}`;
+  }).join('')}</div>`;
+}
+
+function renderJList(){
+  const list = $('#jList'); if(!list) return;
+  const rows = JOURNEYS.filter(journeyMatches);
+  if(!rows.length){ list.replaceChildren(el('div','empty','조건에 해당하는 메일 여정이 없습니다. 키워드나 상태 필터를 조정해 보세요.')); return; }
+  list.replaceChildren(...rows.map(j=>{
+    const r = el('button','jrow'+(selectedJourney===j?' sel':''));
+    r.type = 'button';
+    r.innerHTML = `
+      <div>${stateChip(j.state)}</div>
+      <div><div class="subj">${j.meta.subject}</div><div class="from">${j.meta.sender} → ${j.meta.recipient}</div></div>
+      ${miniLine(j)}
+      <div class="time">${j.meta.received_at}</div>`;
+    r.onclick = ()=>{ selectedJourney=j; renderJList(); renderJDetail(); };
+    return r;
+  }));
+}
+
+/**
+ * 여정 상세 — 노드별 타임라인 렌더 (시그니처 컴포넌트)
+ * @spec FR-02(타임라인)·FR-03(차단 사유)·FR-04(격리 해제)
+ * 상태별 스타일링: reached(노드에 도착) / blocked(정지 표시) / pending(진행 대기)
+ * 구간(segment): from→to 노드의 그라디언트, PENDING 이후는 점선(dead)
+ * React 이관 시 <JourneyTimeline nodes={...}/> 단일 컴포넌트로 추출 권장
+ */
+function renderJDetail(){
+  const d = $('#jDetail'); if(!d) return;
+  const j = selectedJourney;
+  if(!j){ d.innerHTML='<div class="empty">목록에서 메일을 선택하면 여정 타임라인이 표시됩니다.</div>'; return; }
+  const blockedIdx = j.nodes.findIndex(s=>s.status==='QUARANTINED'||s.status==='DELAYED');
+
+  const stations = j.nodes.map((s,i)=>{
+    const n = nodeById(s.node);
+    const cls = s.status==='QUARANTINED' ? 'blocked' : s.status==='PENDING' ? 'pending' : 'reached';
+    const st = el('div',`station ${cls}`);
+    st.style.setProperty('--sc', s.status==='DELAYED' ? 'var(--warn)' : n.color);
+    st.innerHTML = `<div class="s-dot"></div>
+      <div class="s-name" style="${cls!=='pending'?`color:${s.status==='QUARANTINED'?'var(--crit)':s.status==='DELAYED'?'var(--warn)':'inherit'}`:''}">${n.name}</div>
+      <div class="s-time">${s.time||'—'}</div>
+      <div class="s-detail">${s.detail||'이벤트 미수신'}</div>`;
+    return st.outerHTML;
+  });
+
+  const segs = j.nodes.slice(0,-1).map((s,i)=>{
+    const next = j.nodes[i+1];
+    const dead = next.status==='PENDING';
+    const c1 = nodeById(s.node).hex, c2 = dead?'#223052':nodeById(next.node).hex;
+    const lat = (!dead && next.latency!=null) ? `<span class="lat ${next.latency>=2000?'slow':''}">+${(next.latency/1000).toFixed(1)}s</span>` : '';
+    return `<div class="segment ${dead?'dead':''}" style="--c1:${c1};--c2:${c2}"><div class="track"></div>${lat}</div>`;
+  });
+
+  const lineHTML = j.nodes.map((_,i)=> stations[i] + (segs[i]||'')).join('');
+
+  let reason = '';
+  const blocked = j.nodes.find(s=>s.status==='QUARANTINED');
+  const delayed = j.nodes.find(s=>s.status==='DELAYED');
+  if(blocked){
+    reason = `<div class="reason-card">
+      <span class="chip crit">차단 여정</span>
+      <div class="rc-body">
+        <div class="rc-title">${nodeById(blocked.node).name}에서 격리되었습니다</div>
+        <div class="rc-desc">${blocked.detail}<br>고객사 담당자는 이 화면으로 차단 여정을 즉시 확인할 수 있으며(FR-03), 조치 권한 보유 시 아래 버튼으로 격리를 해제할 수 있습니다.</div>
+      </div>
+      <button class="btn danger" id="releaseBtn" type="button">격리 강제 해제</button>
+    </div>`;
+  } else if(delayed){
+    reason = `<div class="reason-card warn">
+      <span class="chip warn">병목 감지</span>
+      <div class="rc-body">
+        <div class="rc-title">${nodeById(delayed.node).name} 구간 정체 (Timeout 엔진 후행)</div>
+        <div class="rc-desc">${delayed.detail}<br>다음 노드 미도달 상태가 지속되어 백엔드 Timeout 엔진이 지연으로 판정했습니다. 관제 현황의 큐 지표를 함께 확인하세요.</div>
+      </div>
+    </div>`;
+  } else {
+    reason = `<div class="reason-card ok">
+      <span class="chip pass">정상</span>
+      <div class="rc-body">
+        <div class="rc-title">전 구간 통과 · 아카이빙 보관 완료</div>
+        <div class="rc-desc">총 소요 ${(j.nodes.reduce((a,s)=>a+(s.latency||0),0)/1000).toFixed(1)}초 — 4개 노드 모두 정상 통과했습니다.</div>
+      </div>
+    </div>`;
+  }
+
+  d.innerHTML = `
+    <div class="jd-head"><div class="subj">${j.meta.subject}</div>${stateChip(j.state)}</div>
+    <div class="jd-meta">
+      <div><div class="k">Message-ID</div><div class="v">${j.message_id.replace('<','&lt;').replace('>','&gt;')}</div></div>
+      <div><div class="k">발신자</div><div class="v">${j.meta.sender}</div></div>
+      <div><div class="k">수신자</div><div class="v">${j.meta.recipient}</div></div>
+      <div><div class="k">최초 수신</div><div class="v">${j.meta.received_at}</div></div>
+    </div>
+    <div class="transit"><div class="t-line">${lineHTML}</div></div>
+    ${reason}`;
+
+  const rb = $('#releaseBtn');
+  if(rb) rb.onclick = ()=>{
+    const b = j.nodes.find(s=>s.status==='QUARANTINED');
+    b.status='PASS'; b.detail += ' — 관리자 해제(admin.kim)';
+    j.state='RELEASED';
+    toast(`POST /api/v1/nodes/release — ${b.node} 격리 해제 완료 (감사 로그 기록: admin.kim)`, 'ok');
+    renderJList(); renderJDetail();
+  };
+}
+
+/* §5 SCR-03 SOS 패키징 ───────────────────────────────────────── FR-05, FR-06
+ * MOCK: runSos()가 550ms 틱 랜덤 진행 + Blob manifest 다운로드
+ * REAL: POST /nodes/sos-package → job_id → GET .../{job_id}/events (SSE)
+ *       상태 머신 CREATED→DISPATCHED→COLLECTING→UPLOADING→MERGING→DONE
+ *       부분 실패 PARTIAL_DONE 케이스 UI 표시 (보안명세 §3.1) */
+let sosNodes = new Set(NODES.map(n=>n.id)), sosRunning=false;
+
+/* ── SOS 저장 설정 (M2-F9 신설) ──────────────────────────────────────────
+ * MOCK: 세션 메모리(sosCfg)에만 저장 / REAL: GET·PUT /api/v1/settings/sos-storage
+ * 보안 핵심: 경로를 tar·mkdir 인자로 넘기면 → 아래 검증은 UX용 1차 방어일 뿐,
+ * 실구현에서는 반드시 서버측에서 동일 규칙 + 실제 쓰기·여유공간 검사 후
+ * systemd ReadWritePaths 화이트리스트와 대조한다 (보안명세 §3.4/§5.3) */
+let sosCfg = { dir:'/var/lib/insight/sos-packages', retentionDays:30, maxGb:50 };
+const SOS_FORBIDDEN = ['/', '/etc', '/boot', '/proc', '/sys', '/dev', '/run',
+                       '/bin', '/sbin', '/usr', '/lib', '/lib64', '/root'];
+/**
+ * 저장 경로 1차 검증 (클라이언트 UX용 — 서버측 검증과 동일 규칙)
+ * @returns {{ok:boolean, msg:string}}
+ */
+function validateSosPath(p){
+  p = (p||'').trim();
+  if(!p.startsWith('/'))               return {ok:false, msg:'절대 경로(/로 시작)만 허용됩니다.'};
+  if(p.includes('..'))                 return {ok:false, msg:"상위 이동 시퀀스('..')는 허용되지 않습니다 (Path Traversal 차단)."};
+  if(!/^[A-Za-z0-9/_.\-]+$/.test(p))  return {ok:false, msg:'경로에는 영문·숫자·/ _ . - 만 사용할 수 있습니다 (명령 주입 차단).'};
+  if(/\/{2,}/.test(p))                return {ok:false, msg:'연속된 슬래시는 허용되지 않습니다.'};
+  const norm = p.replace(/\/+$/,'') || '/';
+  if(SOS_FORBIDDEN.some(f => norm === f || (f !== '/' && norm.startsWith(f + '/'))))
+                                       return {ok:false, msg:`시스템 디렉토리(${norm.split('/').slice(0,2).join('/')}) 하위에는 저장할 수 없습니다.`};
+  if(norm.length > 200)                return {ok:false, msg:'경로가 너무 깁니다 (200자 이내).'};
+  return {ok:true, msg:norm};
+}
+
+views.sos = () => {
+  const v = el('div','view active');
+  v.innerHTML = `
+    <div class="card">
+      <h3>원클릭 SOS 로그 패키징 (FR-05 · POST /api/v1/nodes/sos-package)</h3>
+      <div class="sos-form">
+        <div class="field"><label>수집 시작 시각 (start_time)</label><input type="datetime-local" id="sosStart" value="2026-07-13T13:00"></div>
+        <div class="field"><label>수집 종료 시각 (end_time)</label><input type="datetime-local" id="sosEnd" value="2026-07-13T14:30"></div>
+      </div>
+      <div class="field" style="margin-top:14px"><label>수집 대상 노드</label>
+        <div class="node-picks" id="sosPicks"></div>
+      </div>
+      <div style="display:flex;gap:12px;align-items:center;margin-top:18px">
+        <button class="btn" id="sosRun" type="button">SOS 수집 시작</button>
+        <span class="timer" id="sosTimer"></span>
+        <span class="hint">각 Agent가 해당 시간대 로그(/var/log/*), 프로세스 덤프(top), 디스크 상태(df)를 병렬 수집·압축합니다. 목표: 기존 40분 → <b style="color:var(--pass)">1분 이내</b></span>
+      </div>
+      <div class="sos-steps" id="sosSteps"></div>
+      <div class="sos-result" id="sosResult">
+        <span class="chip pass">병합 완료</span>
+        <div style="flex:1"><div class="fn" id="sosFn"></div><div class="fs" id="sosFs"></div></div>
+        <button class="btn" id="sosDl" type="button">패키지 다운로드</button>
+      </div>
+    </div>
+
+    <div class="card section-gap">
+      <h3>패키지 저장 설정 (M2-F9 · GET/PUT /api/v1/settings/sos-storage) — ADMIN 권한</h3>
+      <div class="field"><label>운영서버 저장 경로 (병합 패키지 보관 위치)</label>
+        <div class="webhook-row">
+          <input id="sosDir" value="${sosCfg.dir}" spellcheck="false" placeholder="/var/lib/insight/sos-packages">
+          <button class="btn ghost" id="sosDirCheck" type="button">경로 검증</button>
+          <button class="btn" id="sosDirSave" type="button">설정 저장</button>
+        </div>
+        <div class="hint" id="sosDirMsg" style="margin-top:8px">허용: 절대 경로, 영문·숫자·<span class="mono">/ _ . -</span> · 금지: <span class="mono">..</span>, 시스템 디렉토리(/etc, /usr, /root 등). 서버가 쓰기 권한·여유 공간을 최종 검증합니다.</div>
+      </div>
+      <div class="sos-form" style="margin-top:16px">
+        <div class="field"><label>보관 기간 — 초과 패키지 자동 폐기 <b class="mono" id="sosRetV" style="color:var(--text)">${sosCfg.retentionDays}일</b></label>
+          <input type="range" min="7" max="180" value="${sosCfg.retentionDays}" id="sosRet" style="width:100%;accent-color:var(--webmail)"></div>
+        <div class="field"><label>저장 디스크 사용 상한 — 초과 시 신규 수집 거부 <b class="mono" id="sosCapV" style="color:var(--text)">${sosCfg.maxGb} GB</b></label>
+          <input type="range" min="10" max="500" step="10" value="${sosCfg.maxGb}" id="sosCap" style="width:100%;accent-color:var(--webmail)"></div>
+      </div>
+      <div class="hint">보관 기간·상한은 SOS가 운영서버 디스크 장애를 유발하지 않도록 하는 안전 장치입니다 (Zero-Impact, 보안명세 §3.2와 동일 원칙).</div>
+    </div>`;
+  content.replaceChildren(v);
+  renderSosPicks(); renderSosSteps();
+  $('#sosRun').onclick = runSos;
+  bindSosStorageCfg();
+};
+
+/** 저장 설정 UI 바인딩 — REAL: PUT /api/v1/settings/sos-storage (ADMIN + 감사 기록) */
+function bindSosStorageCfg(){
+  $('#sosRet').oninput = e=>{ $('#sosRetV').textContent = e.target.value + '일'; };
+  $('#sosCap').oninput = e=>{ $('#sosCapV').textContent = e.target.value + ' GB'; };
+  const showMsg = (ok, text)=>{
+    const m = $('#sosDirMsg');
+    m.innerHTML = ok ? `<span class="chip pass">검증 통과</span> <span style="margin-left:8px">${text}</span>`
+                     : `<span class="chip crit">검증 실패</span> <span style="margin-left:8px;color:#FFB4B4">${text}</span>`;
+  };
+  $('#sosDirCheck').onclick = ()=>{
+    const r = validateSosPath($('#sosDir').value);
+    if(!r.ok) return showMsg(false, r.msg);
+    // MOCK: 서버측 쓰기·여유공간 검사 결과 시뮬레이션
+    showMsg(true, `<span class="mono">${r.msg}</span> · 쓰기 가능 · 파티션 여유 412GB (상한 ${$('#sosCap').value}GB 설정 가능)`);
+  };
+  $('#sosDirSave').onclick = ()=>{
+    const r = validateSosPath($('#sosDir').value);
+    if(!r.ok){ showMsg(false, r.msg); toast('저장 실패 — 경로 검증을 통과하지 못했습니다.', 'err'); return; }
+    sosCfg = { dir:r.msg, retentionDays:+$('#sosRet').value, maxGb:+$('#sosCap').value };
+    $('#sosDir').value = r.msg;
+    showMsg(true, `<span class="mono">${r.msg}</span> 로 저장하도록 설정되었습니다.`);
+    toast(`PUT /api/v1/settings/sos-storage 저장 완료 — 감사 기록: admin.kim`, 'ok');
+  };
+}
+
+function renderSosPicks(){
+  $('#sosPicks').replaceChildren(...NODES.map(n=>{
+    const b = el('button','npick'+(sosNodes.has(n.id)?' on':''));
+    b.type = 'button';
+    b.innerHTML = `<i class="nd" style="background:${n.hex}"></i>${n.name} <span class="mono" style="color:var(--dim)">${n.host}</span>`;
+    b.onclick = ()=>{ if(sosRunning) return; sosNodes.has(n.id)?sosNodes.delete(n.id):sosNodes.add(n.id); renderSosPicks(); renderSosSteps(); };
+    return b;
+  }));
+}
+
+const SOS_PHASES = ['수집 명령 수신','로그 수집 (/var/log/*)','top · df 덤프','압축 및 전송'];
+function renderSosSteps(stateMap){
+  $('#sosSteps').replaceChildren(...NODES.filter(n=>sosNodes.has(n.id)).map(n=>{
+    const st = stateMap?.[n.id] ?? -1; // -1 대기, k 진행중 idx, 99 완료
+    const box = el('div','sos-node');
+    box.innerHTML = `<div class="nn"><i class="nd" style="width:9px;height:9px;border-radius:50%;background:${n.hex}"></i>${n.name}</div>
+      <ul>${SOS_PHASES.map((p,i)=>{
+        const cls = st===99||st>i ? 'done' : st===i ? 'doing' : '';
+        return `<li class="${cls}"><span class="ic"></span>${p}</li>`;
+      }).join('')}</ul>`;
+    return box;
+  }));
+}
+
+/**
+ * SOS 수집 시뮬레이터 — 실구현에서는 이 함수 전체가 아래로 대체됨:
+ *   const {job_id} = await post('/api/v1/nodes/sos-package', {...});
+ *   new EventSource(`/api/v1/nodes/sos-package/${job_id}/events`)
+ *     .onmessage = e => renderSosSteps(JSON.parse(e.data).per_node);
+ * @spec FR-05/06, 보안명세 §3.1 (상태 머신·PARTIAL_DONE)
+ */
+function runSos(){
+  if(sosRunning) return;
+  if(!sosNodes.size){ toast('수집 대상 노드를 1개 이상 선택하세요.','err'); return; }
+  sosRunning = true; $('#sosRun').disabled = true; $('#sosResult').classList.remove('show');
+  const t0 = Date.now();
+  const timerIv = setInterval(()=>{ $('#sosTimer').textContent = `경과 ${( (Date.now()-t0)/1000 ).toFixed(1)}s`; }, 100);
+  const stateMap = {}; [...sosNodes].forEach(id=> stateMap[id]=0);
+  toast('운영서버 — 4개 Edge Agent 비동기 수집 명령 발송 (병렬)', 'ok');
+
+  const iv = setInterval(()=>{
+    let allDone = true;
+    for(const id of sosNodes){
+      if(stateMap[id]===99) continue;
+      // 노드별 랜덤 진행
+      if(Math.random() > 0.35) stateMap[id]++;
+      if(stateMap[id] >= SOS_PHASES.length) stateMap[id]=99;
+      if(stateMap[id]!==99) allDone = false;
+    }
+    renderSosSteps(stateMap);
+    if(allDone){
+      clearInterval(iv); clearInterval(timerIv);
+      const took = ((Date.now()-t0)/1000).toFixed(1);
+      $('#sosTimer').textContent = `완료 — ${took}s`;
+      const fn = `sos_package_20260713_1300-1430.tar.gz`;
+      $('#sosFn').textContent = fn;
+      $('#sosFs').textContent = `저장 위치 ${sosCfg.dir}/${fn} · ${sosNodes.size}개 노드 병합 · 147.2 MB · SHA-256 검증 · 보관 ${sosCfg.retentionDays}일 · 실행자 admin.kim`;
+      $('#sosResult').classList.add('show');
+      $('#sosDl').onclick = ()=> downloadManifest(fn, took);
+      toast(`SOS 패키지 완료 (${took}초) — 기존 40분 대비 단축`, 'ok');
+      sosRunning=false; $('#sosRun').disabled=false;
+    }
+  }, 550);
+}
+
+function downloadManifest(fn, took){
+  const lines = [
+    '# Crinity Insight — SOS Package Manifest (프로토타입 데모)',
+    `# job_id: SOS-20260713-0007 / 실행자: admin.kim / 소요: ${took}s`,
+    `# 대상 구간: 2026-07-13 13:00 ~ 14:30`,
+    `# 저장 위치: ${sosCfg.dir} (보관 ${sosCfg.retentionDays}일 · 상한 ${sosCfg.maxGb}GB)`, '',
+    ...[...sosNodes].map(id=>{
+      const n=nodeById(id);
+      return [`[${id}] ${n.host}`, `  var/log/maillog.13-1300_1430.gz`, `  var/log/messages.13-1300_1430.gz`, `  dump/top_${id.toLowerCase()}.txt`, `  dump/df_${id.toLowerCase()}.txt`, ''].join('\n');
+    }),
+  ].join('\n');
+  const blob = new Blob([lines], {type:'text/plain'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = fn.replace('.tar.gz','_manifest.txt');
+  a.click(); URL.revokeObjectURL(a.href);
+}
+
+/* §6 SCR-04 여정 경보 ────────────────────────────────────────── FR-08~10
+ * MOCK: th 로컬 객체, 테스트 발송은 토스트로 시뮬레이션
+ * REAL: 룰 CRUD API + YAML 원자화, Webhook URL은 시크릿 참조·마스킹 처리
+ *       테스트 발송은 서버에서 실제 POST 후 결과 반환 (보안명세 §4) */
+let th = {disk:90, queue:1000, cpu:85};
+views.alert = () => {
+  const v = el('div','view active');
+  v.innerHTML = `
+    <div class="card">
+      <h3>임계치 설정 (FR-08 / FR-09) — Agent 10초 주기 평가</h3>
+      <div class="th-grid">
+        <div class="th-item"><label>디스크 사용률 초과 시 경보 <b id="thDiskV">${th.disk}%</b></label>
+          <input type="range" min="50" max="99" value="${th.disk}" id="thDisk"></div>
+        <div class="th-item"><label>메일 큐 대기 건수 초과 시 경보 <b id="thQueueV">${th.queue.toLocaleString()}건</b></label>
+          <input type="range" min="100" max="5000" step="100" value="${th.queue}" id="thQueue"></div>
+        <div class="th-item"><label>CPU 사용률 초과 시 경보 <b id="thCpuV">${th.cpu}%</b></label>
+          <input type="range" min="50" max="99" value="${th.cpu}" id="thCpu"></div>
+      </div>
+      <div class="field" style="margin-top:20px"><label>알림 채널 (Slack / Teams Incoming Webhook)</label>
+        <div class="webhook-row">
+          <input id="webhookUrl" value="https://hooks.slack.com/services/T0CRNT/B0OPS/xxxxxxxx" spellcheck="false">
+          <button class="btn ghost" id="testHook" type="button">테스트 발송</button>
+          <button class="btn" id="saveTh" type="button">설정 저장</button>
+        </div>
+        <div class="hint" style="margin-top:8px">운영서버 경보 엔진이 임계치 도달 시 Webhook으로 경고 메시지를 발송합니다. 장애 발생 전 징후를 감지하는 Proactive 체계입니다.</div>
+      </div>
+    </div>
+    <div class="card section-gap">
+      <h3>경보 발생 이력 (FR-10)</h3>
+      <table class="alert-table">
+        <thead><tr><th>발생 시각</th><th>노드</th><th>심각도</th><th>내용</th><th>발송 채널</th></tr></thead>
+        <tbody id="alertRows"></tbody>
+      </table>
+    </div>`;
+  content.replaceChildren(v);
+  const bind = (id, key, fmt) => { $(id).oninput = e=>{ th[key]=+e.target.value; $(id+'V').textContent = fmt(+e.target.value); }; };
+  bind('#thDisk','disk',v=>v+'%'); bind('#thQueue','queue',v=>v.toLocaleString()+'건'); bind('#thCpu','cpu',v=>v+'%');
+  $('#saveTh').onclick = ()=> toast(`임계치 저장 완료 — 디스크 ${th.disk}% / 큐 ${th.queue.toLocaleString()}건 / CPU ${th.cpu}%`, 'ok');
+  $('#testHook').onclick = ()=>{
+    const now = new Date().toTimeString().slice(0,8);
+    alerts.unshift({t:now, node:'MailBreaker', sev:'INFO', msg:'[테스트] Webhook 연동 확인 메시지', ch:'Slack #ops-alert'});
+    renderAlertRows(); toast('Slack Webhook 테스트 발송 성공 (HTTP 200)', 'ok');
+  };
+  renderAlertRows();
+};
+function renderAlertRows(){
+  const tb = $('#alertRows'); if(!tb) return;
+  tb.innerHTML = alerts.map(a=>`<tr>
+    <td class="mono">${a.t}</td>
+    <td><b>${nodeById(a.node)?.name||a.node}</b></td>
+    <td><span class="chip ${a.sev==='CRITICAL'?'crit':a.sev==='WARNING'?'warn':'info'}">${a.sev}</span></td>
+    <td>${a.msg}</td><td class="mono">${a.ch}</td></tr>`).join('');
+}
+
+/* §7 SCR-05 아키텍처 ────────────────────────────────────────── 발표·문서 지원용
+ * 정적 SVG — 실구현에서도 그대로 유지. 원본은 arch_01_3tier.svg 원본 참조 */
+views.arch = () => {
+  const v = el('div','view active');
+  v.innerHTML = `<div class="card arch-wrap">
+    <h3>Edge → Central → Frontend 3-Tier 마이크로아키텍처 · Zero-Impact 원칙</h3>
+    ${archSVG()}
+    <div class="hint" style="margin-top:12px">
+      · Edge Agent: OS 내장 Python 3 + Bash, <b>CPU &lt; 5% / MEM &lt; 100MB</b> — 로그 Regex 파싱 후 경량화된 JSON만 push (NFR-01)<br>
+      · Backend: FastAPI 비동기 I/O — Message-ID 기준 Join·캐싱, Timeout 병목 감지, SOS 오케스트레이션, 경보 발송 (내부망 + API Key, NFR-04)<br>
+      · 운영서버 4대 위에 4개 상용 솔루션이 각자 동작하는 느슨한 결합 구조 (NFR-03)
+    </div></div>`;
+  content.replaceChildren(v);
+};
+
+function archSVG(){
+  const nodeBox = (x,label,host,c)=>`
+    <g transform="translate(${x},300)">
+      <rect width="150" height="86" rx="12" fill="#0F1526" stroke="${c}" stroke-opacity=".55"/>
+      <circle cx="20" cy="24" r="5" fill="${c}"/>
+      <text x="34" y="29" fill="#E8EDF7" font-size="13" font-weight="700">${label}</text>
+      <text x="18" y="50" fill="#8A97B5" font-size="10" font-family="monospace">${host}</text>
+      <text x="18" y="68" fill="#56618A" font-size="10">Edge Agent (Py3/Bash)</text>
+    </g>
+    <path d="M ${x+75} 300 C ${x+75} 260, 410 250, 410 224" stroke="${c}" stroke-opacity=".5" stroke-width="2" fill="none" marker-end="url(#arr)"/>`;
+  return `<svg class="arch-svg" viewBox="0 0 820 410" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="3티어 아키텍처 다이어그램">
+    <defs><marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6" fill="none" stroke="#8A97B5"/></marker></defs>
+    <g transform="translate(285,20)">
+      <rect width="250" height="70" rx="12" fill="#0F1526" stroke="#4C8DFF" stroke-opacity=".6"/>
+      <text x="20" y="30" fill="#E8EDF7" font-size="14" font-weight="800">React 관리자 대시보드</text>
+      <text x="20" y="52" fill="#8A97B5" font-size="11">SPA · RBAC 컴포넌트 분리 · 3초 폴링/SSE</text>
+    </g>
+    <path d="M410 142 L410 90" stroke="#4C8DFF" stroke-width="2" marker-end="url(#arr)"/>
+    <text x="424" y="122" fill="#56618A" font-size="10" font-family="monospace">REST /api/v1 (JSON)</text>
+    <g transform="translate(240,142)">
+      <rect width="340" height="82" rx="12" fill="#131A2C" stroke="#F7B32B" stroke-opacity=".55"/>
+      <text x="20" y="28" fill="#E8EDF7" font-size="14" font-weight="800">FastAPI 운영서버 (비동기 I/O)</text>
+      <text x="20" y="48" fill="#8A97B5" font-size="11">Message-ID Join·캐싱 / Timeout 병목 감지</text>
+      <text x="20" y="66" fill="#8A97B5" font-size="11">SOS 오케스트레이터 / 경보 엔진 → Slack·Teams</text>
+    </g>
+    <text x="30" y="270" fill="#56618A" font-size="10" font-family="monospace">내부망(Private IP) + API Key · 경량화 JSON push</text>
+    ${nodeBox(30,'웹메일','10.10.1.11','#4C8DFF')}
+    ${nodeBox(230,'스팸브레이커','10.10.1.12','#F7B32B')}
+    ${nodeBox(430,'메일브레이커','10.10.1.13','#FF5D5D')}
+    ${nodeBox(630,'아카이빙','10.10.1.14','#35C98E')}
+    <text x="30" y="404" fill="#56618A" font-size="10">Zero-Impact: Agent 리소스 상한 CPU 5% / MEM 100MB — 상용 서비스 무영향</text>
+  </svg>`;
+}
+
+
+/* §8 SCR-06 개발 가이드 ─────────────────────────────────────────────────
+ * 프로토타입의 코드 개발자를 위한 화면. 화면→스펙→API 매핑, MOCK 목록,
+ * React 이관 구조, 데이터 계약을 대시보드 안에서 바로 확인한다. */
+views.dev = () => {
+  const v = el('div','view active');
+  const trow = (cells, head) => `<tr>${cells.map(c=>`<t${head?'h':'d'}${head?'':''}>${c}</t${head?'h':'d'}>`).join('')}</tr>`;
+  v.innerHTML = `
+    <div class="card">
+      <h3>화면 → 요구사항 → API 매핑 (참조 문서: 설계서 v1.0 · 상세명세 v1.1 · 보안명세 v1.2)</h3>
+      <table class="alert-table">
+        <thead>${trow(['화면','충족 요구사항','핵심 API','시그니처 컴포넌트/함수'],1)}</thead>
+        <tbody>
+          ${trow(['SCR-01 관제 현황','FR-07, FR-10','<span class="mono">GET /api/v1/health</span>','renderHealth · renderFeed'])}
+          ${trow(['SCR-02 여정 추적','FR-01~04, FR-11','<span class="mono">GET /journeys · POST /nodes/release</span>','renderJDetail (노드별 타임라인)'])}
+          ${trow(['SCR-03 SOS 패키징','FR-05, FR-06','<span class="mono">POST /nodes/sos-package + SSE</span>','runSos · renderSosSteps'])}
+          ${trow(['SCR-04 여정 경보','FR-08~10','<span class="mono">룰 CRUD · Webhook 테스트</span>','views.alert · renderAlertRows'])}
+        </tbody>
+      </table>
+      <div class="hint" style="margin-top:10px">코드에서 <b>§ 섹션 번호</b>로 검색하면 각 화면 구현부로 바로 이동합니다 (§3~§7).</div>
+    </div>
+
+    <div class="card section-gap">
+      <h3>MOCK 시뮬레이션 목록 — 실구현 시 교체 대상</h3>
+      <table class="alert-table">
+        <thead>${trow(['현재(프로토타입)','실구현 대체','근거 문서'],1)}</thead>
+        <tbody>
+          ${trow(['JOURNEYS / health 상수 (§1)','FastAPI 응답 (필드 구조 동일 — 렌더 계층 무수정)','설계서 §4.3'])}
+          ${trow(['3초 랜덤 지표 변동 (§9)','<span class="mono">GET /health</span> 3초 폴링 (Agent 10초 수집분)','보안명세 §1'])}
+          ${trow(['SOS 랜덤 진행률 (§5)','job 상태 머신 + <span class="mono">EventSource</span>(SSE), PARTIAL_DONE UI 추가','보안명세 §3.1'])}
+          ${trow(['격리 해제 = 토스트만 (§4)','<span class="mono">POST /nodes/release</span> + 확인 모달·사유 입력 + 서버측 RBAC + 감사 기록','보안명세 §5.1/5.5'])}
+          ${trow(['역할 하드코딩 ENGINEER (사이드바)','세션 로그인 + RBAC 미들웨어 (VIEWER/ENGINEER/ADMIN)','보안명세 §5.1'])}
+          ${trow(['8초 후 데모 경보 (§9)','경보 SSE 스트림 구독','보안명세 §4'])}
+          ${trow(['SOS 저장 설정 = 세션 메모리 (§5)','<span class="mono">PUT /settings/sos-storage</span> — 서버측 경로·쓰기·여유공간 검증 + ADMIN 권한 + 감사 기록','보안명세 §3.4'])}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="grid2 section-gap">
+      <div class="card">
+        <h3>React 18 + Vite 이관 구조 제안</h3>
+        <pre class="mono" style="color:var(--muted);line-height:1.9;font-size:12px">src/
+ ├─ api/            client.ts (fetch 래퍼 · 에러 규격)
+ ├─ components/
+ │   ├─ JourneyTimeline/   ← renderJDetail 추출 (시그니처)
+ │   ├─ HealthCard/  StateChip/  Toast/
+ ├─ views/          Overview · Journey · Sos · Alert · Arch
+ ├─ hooks/          usePolling(3s) · useSse(job/alerts)
+ ├─ auth/           RBAC 가드 (FR-11 → 서버 검증과 병행)
+ └─ styles/         tokens.css  ← 본 파일 :root 변수 그대로 이관</pre>
+        <div class="hint">CSS 변수(--webmail 등 4색 노드 팔레트)의 색상 체계는 디자인 토큰으로 그대로 이관합니다.</div>
+      </div>
+      <div class="card">
+        <h3>데이터 계약 (여정 문서 — 설계서 §4.3)</h3>
+        <pre class="mono" style="color:var(--muted);line-height:1.8;font-size:11.5px">{
+  "message_id": "&lt;...&gt;",
+  "meta_info": { sender, recipient,
+                 subject, received_at },
+  "current_state": "QUARANTINED",
+  "journey_nodes": [{ node, status,
+      timestamp, latency_ms, detail }]
+}</pre>
+        <div class="hint" style="line-height:1.8">상태값: PASS · QUARANTINED · DELAYED · PENDING · ARCHIVED<br>
+        프론트 계약 원칙: <b>노드 수 고정 가정 금지</b>(NFR-06 확장성) — NODES 배열 길이 기반 렌더 유지.<br>
+        보안: detail·subject는 로그 원본 문자열 — 이관 시 <span class="mono">dangerouslySetInnerHTML</span> 금지.</div>
+      </div>
+    </div>`;
+  content.replaceChildren(v);
+};
+
+/* §9 BOOT ──────────────────────────────────────────────────────────────
+ * MOCK 타이머 2종: (a) 3초 헬스 랜덤 변동 (b) 8초 후 데모 경보 주입(D-1 사례)
+ * REAL: (a)는 /health 폴링으로, (b)는 SSE 경보 스트림으로 대체 */
+$('#nav').querySelectorAll('button').forEach(b=>{
+  b.onclick = ()=>{
+    $('#nav').querySelector('.active')?.classList.remove('active');
+    b.classList.add('active');
+    $('#viewTitle').textContent = VIEW_TITLES[b.dataset.view];
+    views[b.dataset.view]();
+  };
+});
+
+setInterval(()=>{ $('#clock').textContent = new Date().toLocaleTimeString('ko-KR',{hour12:false}); }, 1000);
+
+/* 3초 폴링 시뮬레이션: 헬스 지표 미세 변동 */
+setInterval(()=>{
+  for(const id in health){
+    const h = health[id];
+    h.cpu  = Math.min(99, Math.max(5, h.cpu + (Math.random()*6-3)|0));
+    h.mem  = Math.min(99, Math.max(20, h.mem + (Math.random()*4-2)|0));
+    h.queue = Math.max(0, h.queue + ((Math.random()*40-18)|0));
+  }
+  renderHealth();
+}, 3000);
+
+/* 데모용 경보 주입 (D-3 시나리오) */
+setTimeout(()=>{
+  const now = new Date().toTimeString().slice(0,8);
+  alerts.unshift({t:now, node:'MailBreaker', sev:'CRITICAL', msg:'격리 이벤트 발생 — DLP 룰 매칭 (주민등록번호)', ch:'Slack #ops-alert'});
+  renderFeed(); renderAlertRows();
+  toast('신규 경보: 메일브레이커 DLP 격리 이벤트 — 3초 내 대시보드 반영', 'err');
+}, 8000);
+
+views.overview();
+</script>
+</body>
+</html>

@@ -6,8 +6,10 @@ import Tabs from './components/Tabs.jsx'
 import SummaryPanel from './components/SummaryPanel.jsx'
 import AdminPanel from './components/admin/AdminPanel.jsx'
 import Toast from './components/common/Toast.jsx'
+import * as api from './api.js'
 
 const POLL_MS = 3000
+const HEALTH_POLL_MS = 5000
 const TOAST_MS = 3500
 
 export default function App() {
@@ -17,6 +19,7 @@ export default function App() {
   const [query, setQuery] = useState('')
   const [lastFetch, setLastFetch] = useState(null)
   const [error, setError] = useState(false)
+  const [health, setHealth] = useState(null)
   const [toasts, setToasts] = useState([])
   const toastId = useRef(0)
 
@@ -48,6 +51,22 @@ export default function App() {
     return () => { alive = false; clearInterval(id) }
   }, [])
 
+  // 관리 API의 시스템 진단(사이트명/가동시간/경로 상태) 폴링 — 없어도 파일 감사 자체엔 영향 없음
+  useEffect(() => {
+    let alive = true
+    const load = async () => {
+      try {
+        const h = await api.getHealth()
+        if (alive) setHealth(h)
+      } catch {
+        if (alive) setHealth(null)
+      }
+    }
+    load()
+    const id = setInterval(load, HEALTH_POLL_MS)
+    return () => { alive = false; clearInterval(id) }
+  }, [])
+
   const filtered = useMemo(() => {
     return events.filter(e => {
       const okType =
@@ -75,7 +94,10 @@ export default function App() {
     <div className="app">
       <header className="header">
         <div>
-          <h1>LHAMS<span>_</span>AUDIT</h1>
+          <h1>
+            LHAMS<span>_</span>AUDIT
+            {health && <span className="site-badge">{health.site_name} · {health.site_id}</span>}
+          </h1>
           <p className="subtitle">
             리눅스 하이브리드 메일 감사 시스템 · 누가, 언제, 무엇을 변경했는가
           </p>
@@ -92,23 +114,25 @@ export default function App() {
 
       <Tabs active={tab} setActive={setTab} />
 
-      {tab === 'summary' && <SummaryPanel events={events} agentDown={error} />}
+      <div className="tab-content" key={tab}>
+        {tab === 'summary' && <SummaryPanel events={events} agentDown={error} health={health} />}
 
-      {tab === 'dashboard' && (
-        <>
-          <StatCards stats={stats} />
-          <FilterBar filter={filter} setFilter={setFilter}
-                     query={query} setQuery={setQuery} />
-          <EventTable events={filtered} />
+        {tab === 'dashboard' && (
+          <>
+            <StatCards stats={stats} />
+            <FilterBar filter={filter} setFilter={setFilter}
+                       query={query} setQuery={setQuery} />
+            <EventTable events={filtered} />
 
-          <p className="footer-note">
-            source: inotify + auditd + clamd · 최근 200건 유지 ·
-            전체 이력은 /mail/lhams_project/data/logs (일별 로테이션)
-          </p>
-        </>
-      )}
+            <p className="footer-note">
+              source: inotify + auditd + clamd · 최근 200건 유지 ·
+              전체 이력은 /mail/lhams_project/data/logs (일별 로테이션)
+            </p>
+          </>
+        )}
 
-      {tab === 'admin' && <AdminPanel pushToast={pushToast} />}
+        {tab === 'admin' && <AdminPanel pushToast={pushToast} />}
+      </div>
 
       <Toast toasts={toasts} />
     </div>

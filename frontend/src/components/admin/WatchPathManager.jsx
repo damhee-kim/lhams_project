@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Trash2, FolderTree } from 'lucide-react'
+import { Trash2, FolderTree, TriangleAlert } from 'lucide-react'
 import Toggle from '../common/Toggle.jsx'
 import ConfirmDialog from '../common/ConfirmDialog.jsx'
 
@@ -50,7 +50,7 @@ export default function WatchPathManager({ paths, onAdd, onToggle, onRemove }) {
       <div className="path-list">
         {paths.length === 0 && <div className="admin-empty">등록된 감시 경로가 없습니다.</div>}
         {paths.map(p => (
-          <div key={p.id} className={`path-row ${p.enabled ? '' : 'disabled'}`}>
+          <div key={p.id} className={`path-row ${p.enabled ? '' : 'disabled'} ${p.error ? 'has-error' : ''}`}>
             <Toggle checked={p.enabled} onChange={v => onToggle(p.id, { enabled: v })} />
             <div className="path-info">
               <div className="path-text">{p.path}</div>
@@ -58,6 +58,15 @@ export default function WatchPathManager({ paths, onAdd, onToggle, onRemove }) {
                 <span className={`badge-mini ${p.recursive ? 'on' : ''}`}>
                   {p.recursive ? '하위 폴더 포함' : '단일 폴더'}
                 </span>
+                {p.enabled && (
+                  p.error ? (
+                    <span className="badge-mini error">
+                      <TriangleAlert size={11} /> {p.error}
+                    </span>
+                  ) : (
+                    <span className="badge-mini on">감시 중</span>
+                  )
+                )}
               </div>
             </div>
             <button className="icon-btn danger" title="삭제" onClick={() => setRemoveTarget(p)}>

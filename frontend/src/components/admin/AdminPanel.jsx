@@ -5,6 +5,8 @@ import WatchPathManager from './WatchPathManager.jsx'
 import QuarantineManager from './QuarantineManager.jsx'
 import IgnoreRulesEditor from './IgnoreRulesEditor.jsx'
 import AdminAuditLog from './AdminAuditLog.jsx'
+import ConfigBackup from './ConfigBackup.jsx'
+import Spinner from '../common/Spinner.jsx'
 import * as api from '../../api.js'
 
 const POLL_MS = 5000
@@ -134,6 +136,8 @@ export default function AdminPanel({ pushToast }) {
     }
   }
 
+  const handleImported = () => Promise.all([loadConfig(), loadAuditLog()])
+
   const handleSuffixChange = async (next) => {
     if (!requireActor()) return
     setSuffixes(next)
@@ -147,7 +151,7 @@ export default function AdminPanel({ pushToast }) {
     }
   }
 
-  if (loading) return <div className="admin-empty">불러오는 중…</div>
+  if (loading) return <Spinner label="관리자 설정을 불러오는 중…" />
 
   return (
     <div className="admin-panel">
@@ -156,6 +160,7 @@ export default function AdminPanel({ pushToast }) {
       <WatchPathManager paths={paths} onAdd={handleAdd} onToggle={handleToggle} onRemove={handleRemove} />
       <QuarantineManager entries={quarantine} onRestore={handleRestore} onDelete={handleDelete} />
       <IgnoreRulesEditor suffixes={suffixes} onChange={handleSuffixChange} />
+      <ConfigBackup onImported={handleImported} pushToast={pushToast} requireActor={requireActor} />
       <AdminAuditLog entries={auditLog} />
     </div>
   )

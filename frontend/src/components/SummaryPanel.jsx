@@ -1,8 +1,5 @@
-import { useEffect, useMemo, useState, useCallback } from 'react'
-import { ShieldCheck, ShieldAlert, ShieldX, FolderTree, Archive } from 'lucide-react'
-import * as api from '../api.js'
-
-const POLL_MS = 5000
+import { useMemo } from 'react'
+import { ShieldCheck, ShieldAlert, ShieldX, FolderTree, Archive, Activity, Tag } from 'lucide-react'
 
 function basename(p) {
   if (!p) return ''
@@ -28,26 +25,17 @@ function describeEvent(e) {
   }
 }
 
-export default function SummaryPanel({ events, agentDown }) {
-  const [pathCount, setPathCount] = useState(null)
-  const [quarantineCount, setQuarantineCount] = useState(null)
+function formatUptime(sec) {
+  if (sec == null) return '—'
+  const d = Math.floor(sec / 86400)
+  const h = Math.floor((sec % 86400) / 3600)
+  const m = Math.floor((sec % 3600) / 60)
+  if (d > 0) return `${d}일 ${h}시간`
+  if (h > 0) return `${h}시간 ${m}분`
+  return `${m}분`
+}
 
-  const load = useCallback(async () => {
-    try {
-      const [cfg, quarantine] = await Promise.all([api.getConfig(), api.listQuarantine()])
-      setPathCount(cfg.watch_paths.length)
-      setQuarantineCount(quarantine.length)
-    } catch {
-      // 관리 API가 아직 안 떴을 수 있음 — 요약 화면은 조용히 대기
-    }
-  }, [])
-
-  useEffect(() => {
-    load()
-    const id = setInterval(load, POLL_MS)
-    return () => clearInterval(id)
-  }, [load])
-
+export default function SummaryPanel({ events, agentDown, health }) {
   const counts = useMemo(() => ({
     created: events.filter(e => e.event_type === 'CREATED').length,
     modified: events.filter(e => e.event_type === 'MODIFIED').length,
@@ -56,11 +44,13 @@ export default function SummaryPanel({ events, agentDown }) {
     malware: events.filter(e => e.event_type === 'MALWARE_DETECTED').length,
   }), [events])
 
+  const pathErrorCount = health?.watch_paths_error ?? 0
+
   const status = useMemo(() => {
     if (agentDown) return 'down'
-    if (counts.malware > 0 || counts.deleted > 0) return 'attention'
+    if (counts.malware > 0 || counts.deleted > 0 || pathErrorCount > 0) return 'attention'
     return 'clean'
-  }, [agentDown, counts])
+  }, [agentDown, counts, pathErrorCount])
 
   const highlights = useMemo(() => (
     events
@@ -77,7 +67,9 @@ export default function SummaryPanel({ events, agentDown }) {
     attention: {
       icon: <ShieldAlert size={28} />,
       title: '확인이 필요한 이벤트가 있습니다',
-      desc: '삭제 또는 악성코드 탐지 이벤트가 발생했습니다. 시스템이 자동으로 차단·격리했지만, 아래 내역을 검토해 주세요.',
+      desc: pathErrorCount > 0
+        ? `감시 경로 ${pathErrorCount}곳이 실제로는 감시되지 않고 있습니다(경로 없음). 관리자 탭에서 확인해 주세요.`
+        : '삭제 또는 악성코드 탐지 이벤트가 발생했습니다. 시스템이 자동으로 차단·격리했지만, 아래 내역을 검토해 주세요.',
     },
     clean: {
       icon: <ShieldCheck size={28} />,
@@ -101,15 +93,33 @@ export default function SummaryPanel({ events, agentDown }) {
         <div className="summary-fact">
           <FolderTree size={18} />
           <div>
-            <div className="summary-fact-value">{pathCount ?? '—'}곳</div>
-            <div className="summary-fact-label">감시 중인 경로</div>
+            <div className="summary-fact-value">
+              {health ? `${health.watch_paths_active}/${health.watch_paths_total}` : '—'}곳
+            </div>
+            <div className="summary-fact-label">
+              감시 중인 경로(활성/전체){pathErrorCount > 0 && ` · 오류 ${pathErrorCount}곳`}
+            </div>
           </div>
         </div>
         <div className="summary-fact">
           <Archive size={18} />
           <div>
-            <div className="summary-fact-value">{quarantineCount ?? '—'}건</div>
-            <div className="summary-fact-label">격리된 파일 {quarantineCount > 0 && '(검토 필요)'}</div>
+            <div className="summary-fact-value">{health?.quarantine_count ?? '—'}건</div>
+            <div className="summary-fact-label">격리된 파일 {health?.quarantine_count > 0 && '(검토 필요)'}</div>
+          </div>
+        </div>
+        <div className="summary-fact">
+          <Activity size={18} />
+          <div>
+            <div className="summary-fact-value">{formatUptime(health?.uptime_sec)}</div>
+            <div className="summary-fact-label">에이전트 가동 시간 · v{health?.version ?? '—'}</div>
+          </div>
+        </div>
+        <div className="summary-fact">
+          <Tag size={18} />
+          <div>
+            <div className="summary-fact-value">{health?.site_name ?? '—'}</div>
+            <div className="summary-fact-label">사이트 ID: {health?.site_id ?? '—'}</div>
           </div>
         </div>
       </div>

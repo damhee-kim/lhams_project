@@ -12,6 +12,29 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+// 다크 테마에 맞춘 스크롤바 (Chromium/Edge 계열)
+* {
+  scrollbar-width: thin;
+  scrollbar-color: $line $bg;
+
+  &::-webkit-scrollbar { width: 9px; height: 9px; }
+  &::-webkit-scrollbar-track { background: transparent; }
+  &::-webkit-scrollbar-thumb {
+    background: $line;
+    border-radius: 99px;
+    &:hover { background: $muted; }
+  }
+}
+
+.tab-content {
+  animation: tab-fade-in .18s ease-out;
+}
+
+@keyframes tab-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 .app {
   max-width: 1240px;
   margin: 0 auto;
@@ -34,6 +57,19 @@ body {
     color: #fff;
 
     span { color: $clean; }
+  }
+
+  .site-badge {
+    display: inline-block;
+    margin-left: 12px;
+    vertical-align: middle;
+    font: 600 11px $sans;
+    letter-spacing: 0;
+    color: $muted;
+    background: $panel-2;
+    border: 1px solid $line;
+    border-radius: 99px;
+    padding: 3px 12px;
   }
 
   .subtitle {

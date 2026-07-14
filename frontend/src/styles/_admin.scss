@@ -72,6 +72,21 @@
   margin: 0 0 14px;
   color: $muted;
   font-size: 12px;
+
+  code {
+    background: $panel-2;
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-family: $mono;
+    font-size: 11px;
+    color: $text;
+  }
+}
+
+.config-backup-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .admin-empty {
@@ -79,6 +94,29 @@
   font-size: 13px;
   padding: 16px 0;
   text-align: center;
+}
+
+.spinner-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: $muted;
+  font-size: 13px;
+  padding: 40px 0;
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid rgba($clean, .25);
+  border-top-color: $clean;
+  animation: spin .7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 .admin-error {
@@ -179,7 +217,9 @@ button.danger {
 .path-meta { margin-top: 4px; }
 
 .badge-mini {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 10px;
   font-weight: 600;
   padding: 2px 8px;
@@ -187,6 +227,11 @@ button.danger {
   color: $muted;
   background: rgba($muted, .12);
   &.on { color: $clean; background: rgba($clean, .12); }
+  &.error { color: $critical; background: rgba($critical, .14); }
+}
+
+.path-row.has-error {
+  border-color: rgba($critical, .5);
 }
 
 .q-file { font: 600 13px $mono; color: $text; }
@@ -444,7 +489,13 @@ button.danger {
 
 .audit-time { color: $muted; white-space: nowrap; }
 .audit-actor { color: #fff; font-weight: 600; }
-.audit-action { color: $warn; }
+.audit-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: $warn;
+  svg { flex-shrink: 0; }
+}
 .audit-target {
   color: $text;
   word-break: break-all;
@@ -463,6 +514,9 @@ button.danger {
 }
 
 .toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   background: $panel-2;
   border: 1px solid $line;
   border-left: 3px solid $clean;
@@ -472,6 +526,13 @@ button.danger {
   color: $text;
   box-shadow: 0 4px 16px rgba(#000, .35);
   min-width: 220px;
+  animation: toast-in .2s ease-out;
 
-  &.error { border-left-color: $critical; }
+  svg { flex-shrink: 0; color: $clean; }
+  &.error { border-left-color: $critical; svg { color: $critical; } }
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(16px); }
+  to   { opacity: 1; transform: translateX(0); }
 }

@@ -47,3 +47,10 @@ export const updateChecklist = (id, done) =>
   request(`/checklist/${id}`, { method: 'PATCH', body: withActor({ done }) })
 
 export const listAdminAudit = () => request('/admin-audit')
+
+export const getHealth = () => request('/health')
+
+export const exportConfig = () => request('/config/export')
+
+export const importConfig = (config) =>
+  request('/config/import', { method: 'POST', body: withActor({ config }) })

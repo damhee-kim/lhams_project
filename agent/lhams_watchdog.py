@@ -17,6 +17,7 @@ LHAMS Watchdog Control Tower
 
 import os
 import re
+import glob
 import time
 import json
 import shutil
@@ -38,17 +39,34 @@ except ImportError:
     pwd = None
 
 # ──────────────────────────── 설정 ────────────────────────────
-WATCH_DIR       = os.environ.get("LHAMS_WATCH_DIR",  "/mail/test_monitor")
-JSON_LOG_FILE   = os.environ.get("LHAMS_JSON_LOG",   "/mail/lhams_project/frontend/public/lhams_audit.json")
-TEXT_LOG_FILE   = os.environ.get("LHAMS_TEXT_LOG",   "/mail/lhams_project/data/logs/lhams_audit.log")
-QUARANTINE_DIR  = os.environ.get("LHAMS_QUARANTINE", "/mail/lhams_project/data/quarantine")
-CONFIG_FILE     = os.environ.get("LHAMS_CONFIG",     "/mail/lhams_project/data/config.json")
-CHECKLIST_FILE  = os.environ.get("LHAMS_CHECKLIST",  "/mail/lhams_project/data/checklist.json")
-ADMIN_AUDIT_FILE = os.environ.get("LHAMS_ADMIN_AUDIT", "/mail/lhams_project/data/admin_audit.json")
+# SI/온프레미스 다중 서버 배포 시, 개별 경로를 일일이 지정하는 대신
+# LHAMS_HOME 하나만 지정하면 아래 모든 경로가 그 하위로 자동 구성된다.
+# (개별 LHAMS_xxx 환경변수를 지정하면 그 값이 항상 우선한다 — 하위호환)
+LHAMS_HOME = os.environ.get("LHAMS_HOME", "/mail/lhams_project")
+LHAMS_VERSION = "1.1.0"
+
+# 다중 고객사/다중 서버 운영 시 이 인스턴스를 식별하기 위한 이름표
+SITE_NAME = os.environ.get("LHAMS_SITE_NAME", "LHAMS")
+SITE_ID   = os.environ.get("LHAMS_SITE_ID",   "default")
+
+
+def _home(rel_path: str) -> str:
+    return os.path.join(LHAMS_HOME, *rel_path.split("/"))
+
+
+WATCH_DIR       = os.environ.get("LHAMS_WATCH_DIR",  _home("data/test_monitor"))
+JSON_LOG_FILE   = os.environ.get("LHAMS_JSON_LOG",   _home("frontend/public/lhams_audit.json"))
+TEXT_LOG_FILE   = os.environ.get("LHAMS_TEXT_LOG",   _home("data/logs/lhams_audit.log"))
+QUARANTINE_DIR  = os.environ.get("LHAMS_QUARANTINE", _home("data/quarantine"))
+CONFIG_FILE     = os.environ.get("LHAMS_CONFIG",     _home("data/config.json"))
+CHECKLIST_FILE  = os.environ.get("LHAMS_CHECKLIST",  _home("data/checklist.json"))
+ADMIN_AUDIT_FILE = os.environ.get("LHAMS_ADMIN_AUDIT", _home("data/admin_audit.json"))
+CONFIG_BACKUP_DIR = os.environ.get("LHAMS_CONFIG_BACKUP", _home("data/config_backups"))
 API_PORT        = int(os.environ.get("LHAMS_API_PORT", "8787"))
 AUDIT_KEY       = "lhams_audit"      # auditd 규칙 태그 (-k)
 MAX_JSON_EVENTS = 200                # 대시보드 유지 건수
 MAX_ADMIN_AUDIT_EVENTS = 500         # 관리자 변경 이력 유지 건수
+MAX_CONFIG_BACKUPS = 20              # 설정 백업 보관 개수
 DEFAULT_IGNORE_SUFFIX = [".swp", ".swx", ".swpx", ".tmp", "~", ".part"]
 
 QUARANTINE_META_FILE = os.path.join(QUARANTINE_DIR, "_meta.json")
@@ -107,7 +125,22 @@ class ConfigStore:
             }
             self._save()
 
+    def _backup(self):
+        """덮어쓰기 전 현재 파일을 타임스탬프 이름으로 보관 (설정 변경 이력/복구용)."""
+        if not os.path.exists(self.path):
+            return
+        try:
+            os.makedirs(CONFIG_BACKUP_DIR, exist_ok=True)
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+            shutil.copy2(self.path, os.path.join(CONFIG_BACKUP_DIR, f"config_{ts}.json"))
+            backups = sorted(glob.glob(os.path.join(CONFIG_BACKUP_DIR, "config_*.json")))
+            for old in backups[:-MAX_CONFIG_BACKUPS]:
+                os.remove(old)
+        except OSError as e:
+            logger.error("설정 백업 실패: %s", e)
+
     def _save(self):
+        self._backup()
         with open(self.path, "w", encoding="utf-8") as f:
             json.dump(self.data, f, ensure_ascii=False, indent=2)
 
@@ -140,6 +173,7 @@ class WatchManager:
         self.store = store
         self._lock = threading.Lock()
         self._watches = {}  # id -> ObservedWatch (활성 상태인 경우만)
+        self._errors = {}   # id -> 사유 (경로 없음 등으로 스케줄 실패한 경우)
 
     def start_all(self):
         with self._lock:
@@ -149,19 +183,50 @@ class WatchManager:
 
     def _schedule(self, entry):
         if not os.path.isdir(entry["path"]):
+            self._errors[entry["id"]] = "경로가 존재하지 않습니다"
             logger.error("감시 경로 없음, 건너뜀: %s", entry["path"])
             return
         watch = self.observer.schedule(self.handler, entry["path"], recursive=entry["recursive"])
         self._watches[entry["id"]] = watch
+        self._errors.pop(entry["id"], None)
 
     def _unschedule(self, path_id):
         watch = self._watches.pop(path_id, None)
         if watch is not None:
             self.observer.unschedule(watch)
+        self._errors.pop(path_id, None)
 
     def to_list(self):
         with self._lock:
-            return [dict(e) for e in self.store.watch_paths]
+            out = []
+            for e in self.store.watch_paths:
+                d = dict(e)
+                d["active"] = e["id"] in self._watches
+                d["error"] = self._errors.get(e["id"])
+                out.append(d)
+            return out
+
+    def active_count(self):
+        with self._lock:
+            return len(self._watches)
+
+    def error_count(self):
+        with self._lock:
+            return len(self._errors)
+
+    def replace_all(self, watch_paths, ignore_suffixes):
+        """설정 가져오기(import) — 기존 감시를 전부 내리고 새 목록으로 재구성."""
+        with self._lock:
+            for pid in list(self._watches):
+                self._unschedule(pid)
+            self._errors.clear()
+            self.store.data["watch_paths"] = watch_paths
+            self.store.data["ignore_suffixes"] = ignore_suffixes
+            self.store.data["next_id"] = max((p["id"] for p in watch_paths), default=0) + 1
+            for entry in self.store.watch_paths:
+                if entry.get("enabled"):
+                    self._schedule(entry)
+            self.store.save()
 
     def add_path(self, path, recursive=True):
         path = os.path.normpath(path)
@@ -423,6 +488,7 @@ class LhamsAuditHandler(FileSystemEventHandler):
         self.auditd = AuditdResolver()
         self.store = store
         self.quarantine_store = quarantine_store
+        self.last_event_at = None
         os.makedirs(os.path.dirname(JSON_LOG_FILE), exist_ok=True)
         os.makedirs(QUARANTINE_DIR, exist_ok=True)
         if not os.path.exists(JSON_LOG_FILE):
@@ -474,6 +540,7 @@ class LhamsAuditHandler(FileSystemEventHandler):
             return
 
         now = datetime.now()
+        self.last_event_at = now
         owner = self.get_owner(filepath) if os.path.exists(filepath) else "unknown"
 
         # auditd로 실제 행위자(누가) 조회
@@ -553,7 +620,8 @@ class LhamsAuditHandler(FileSystemEventHandler):
 
 # ─────────────────────────── 관리 API (Flask) ───────────────────────────
 def create_api(watch_manager: WatchManager, config_store: ConfigStore, quarantine_store: QuarantineStore,
-                checklist_store: ChecklistStore, admin_audit: AdminAuditLog):
+                checklist_store: ChecklistStore, admin_audit: AdminAuditLog, handler: LhamsAuditHandler,
+                start_time: datetime):
     app = Flask("lhams_admin_api")
 
     def err(message, status=400):
@@ -567,6 +635,45 @@ def create_api(watch_manager: WatchManager, config_store: ConfigStore, quarantin
         return jsonify({
             "watch_paths": watch_manager.to_list(),
             "ignore_suffixes": config_store.ignore_suffixes,
+        })
+
+    @app.get("/api/config/export")
+    def export_config():
+        return jsonify(config_store.data)
+
+    @app.post("/api/config/import")
+    def import_config():
+        body = request.get_json(silent=True) or {}
+        incoming = body.get("config")
+        if not isinstance(incoming, dict):
+            return err("올바른 설정 파일이 아닙니다")
+        watch_paths = incoming.get("watch_paths")
+        ignore_suffixes = incoming.get("ignore_suffixes")
+        if not isinstance(watch_paths, list) or not isinstance(ignore_suffixes, list):
+            return err("watch_paths / ignore_suffixes 형식이 올바르지 않습니다")
+        try:
+            watch_manager.replace_all(watch_paths, ignore_suffixes)
+            admin_audit.record(actor_of(body), "CONFIG_IMPORT", "전체 설정",
+                                f"경로 {len(watch_paths)}개, 무시 규칙 {len(ignore_suffixes)}개로 교체")
+            return jsonify({
+                "watch_paths": watch_manager.to_list(),
+                "ignore_suffixes": config_store.ignore_suffixes,
+            })
+        except Exception as e:
+            return err(f"가져오기 실패: {e}")
+
+    @app.get("/api/health")
+    def health():
+        return jsonify({
+            "site_name": SITE_NAME,
+            "site_id": SITE_ID,
+            "version": LHAMS_VERSION,
+            "uptime_sec": int((datetime.now() - start_time).total_seconds()),
+            "watch_paths_total": len(config_store.watch_paths),
+            "watch_paths_active": watch_manager.active_count(),
+            "watch_paths_error": watch_manager.error_count(),
+            "quarantine_count": len(quarantine_store.list()),
+            "last_event_at": handler.last_event_at.strftime("%Y-%m-%d %H:%M:%S") if handler.last_event_at else None,
         })
 
     @app.post("/api/paths")
@@ -676,6 +783,7 @@ def create_api(watch_manager: WatchManager, config_store: ConfigStore, quarantin
 
 
 if __name__ == "__main__":
+    start_time = datetime.now()
     config_store = ConfigStore(CONFIG_FILE)
     quarantine_store = QuarantineStore(QUARANTINE_META_FILE)
     checklist_store = ChecklistStore(CHECKLIST_FILE)
@@ -687,15 +795,16 @@ if __name__ == "__main__":
     watch_manager.start_all()
     observer.start()
 
-    api = create_api(watch_manager, config_store, quarantine_store, checklist_store, admin_audit)
+    api = create_api(watch_manager, config_store, quarantine_store, checklist_store, admin_audit,
+                      handler, start_time)
     api_thread = threading.Thread(
         target=lambda: api.run(host="0.0.0.0", port=API_PORT, threaded=True, use_reloader=False),
         daemon=True,
     )
     api_thread.start()
 
-    logger.info("[*] LHAMS Watchdog started. Watching %d path(s). Admin API on :%d",
-                len(config_store.watch_paths), API_PORT)
+    logger.info("[*] LHAMS Watchdog[%s/%s v%s] started. Watching %d path(s). Admin API on :%d",
+                SITE_NAME, SITE_ID, LHAMS_VERSION, len(config_store.watch_paths), API_PORT)
     try:
         while True:
             time.sleep(1)

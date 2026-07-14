@@ -52,6 +52,22 @@ sudo cp ../nginx/lhams.conf /etc/nginx/conf.d/
 sudo systemctl restart nginx  # http://서버IP
 ```
 
+### 설정 방식 — `LHAMS_HOME` 한 줄로 배포
+
+`lhams_watchdog.py`는 기본적으로 `/mail/lhams_project`를 홈으로 가정합니다. 다른 경로에
+배치했다면 개별 `LHAMS_xxx` 환경변수를 일일이 지정하는 대신 `LHAMS_HOME` 하나만 지정하면
+`data/`, `frontend/public/lhams_audit.json` 등 모든 하위 경로가 자동으로 구성됩니다
+(개별 `LHAMS_WATCH_DIR` 등을 지정하면 그 값이 항상 우선합니다 — 하위호환 유지).
+
+```bash
+# systemd 유닛(Environment=) 또는 실행 전 export로 지정
+export LHAMS_HOME=/mail/lhams_project
+
+# 다중 서버 / SI 고객사 구축 시 이 인스턴스를 식별하는 이름표 (대시보드 헤더에 표시)
+export LHAMS_SITE_NAME="본사 메일서버"
+export LHAMS_SITE_ID="hq-01"
+```
+
 ## 세미나 데모 시나리오
 
 ```bash
@@ -61,7 +77,11 @@ touch new_mail.txt                                   # 1) 생성 → Low
 echo "update" > new_mail.txt                         # 2) 수정 → Low
 mv new_mail.txt replaced_mail.txt                    # 3) 교체(이동) → Medium, 행위자 기록
 rm replaced_mail.txt                                 # 4) 삭제 → High
-wget https://secure.eicar.org/eicar.com -O test.com  # 5) 악성코드 → Critical + 자동 격리
+
+# 5) 악성코드 → Critical + 자동 격리
+# 폐쇄망(인터넷 차단) 환경 대응: 인터넷에서 내려받는 대신 EICAR 테스트 문자열을
+# 로컬에서 직접 생성한다 (ClamAV가 시그니처로 인식하는 표준 테스트 문자열, 실제 악성코드 아님)
+printf '%s' 'X5O!P%@AP[4\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*' > test.com
 ```
 
 대시보드에서 각 행 왼쪽의 **위험도 레일**(색 띠)과 함께 시각·이벤트·경로·**행위자(auditd auid)**·
@@ -110,6 +130,7 @@ Tomcat이라면 `ServletContextListener.contextInitialized()`에서 스레드로
 | `data/quarantine/_meta.json` | 격리 파일의 원본 경로/시각/사유 |
 | `data/checklist.json` | 설치 체크리스트 진행 상태(완료자/완료 시각) |
 | `data/admin_audit.json` | 관리자 변경 이력(최근 500건) — 파일 감사로그(`lhams_audit.json`)와는 별개로, "관리 조작 자체"를 감사 대상으로 기록 |
+| `data/config_backups/` | `config.json` 변경 시마다 남는 자동 백업본 (최근 20개 보관) |
 
 프론트엔드는 dev 환경에서 Vite 프록시로, 운영 환경에서는 `nginx/lhams.conf`의 `/api/` 리버스 프록시로 이 API에 접근합니다.
 
@@ -124,6 +145,62 @@ export LHAMS_API_PORT=8787
 브라우저 로컬 저장소에만 남기 때문에 신뢰 경계 안(사내망, 신뢰된 관리자만 접근)에서 "누가 바꿨다고
 스스로 밝혔는지"를 기록하는 용도이며, 실제 계정 인증이 필요하면 `agent/lhams_watchdog.py`의
 `actor_of()` 부분을 사내 SSO/계정 로그인 연동으로 교체하면 됩니다.
+
+## 다중 서버 / SI 고객사 운영
+
+여러 서버·고객사에 LHAMS를 나눠서 구축·운영할 때 필요한 기능들입니다.
+
+- **사이트 식별**: `LHAMS_SITE_NAME`/`LHAMS_SITE_ID`로 인스턴스에 이름표를 붙이면, 대시보드
+  헤더에 항상 표시되어 "지금 어느 서버 화면을 보고 있는지"를 혼동하지 않습니다.
+- **시스템 진단 (`GET /api/health`)**: 사이트명/ID, 버전, 에이전트 가동 시간, 감시 경로
+  활성/전체 개수, 격리 파일 수, 마지막 이벤트 수신 시각을 한 번에 반환합니다. 요약 탭에서
+  실시간으로 보여주며, 별도 모니터링 시스템(Zabbix/Prometheus 등)에서 헬스체크 용도로도
+  그대로 호출할 수 있습니다.
+- **감시 경로 상태 표시**: 등록은 됐지만 실제 디렉토리가 없어졌거나 권한 문제로 감시가 안 되고
+  있는 경로를 관리자 탭에서 "⚠ 경로가 존재하지 않습니다" 배지로 즉시 확인할 수 있습니다
+  (이전에는 서버 로그를 봐야만 알 수 있었던 실패가 조용히 묻히는 문제를 해결).
+- **설정 자동 백업**: `data/config.json`이 바뀔 때마다 `data/config_backups/`에 타임스탬프
+  이름으로 스냅샷이 남습니다(최근 20개 보관, 자동 정리). 실수로 잘못 바꿔도 되돌릴 근거가 남습니다.
+- **설정 내보내기 / 가져오기**: 관리자 탭 "설정 백업/이전"에서 현재 감시 경로·무시 규칙을 JSON
+  파일로 내려받거나, 다른 서버에서 받은 JSON을 그대로 업로드해 동일하게 적용할 수 있습니다.
+  신규 고객사에 표준 설정을 그대로 복제 배포할 때 유용합니다. (누가 가져오기를 했는지도
+  관리자 변경 이력에 `CONFIG_IMPORT`로 남습니다.)
+
+## 폐쇄망(에어갭) 배포 가이드
+
+이 프로젝트는 런타임에 외부 인터넷 호출이 전혀 없습니다 (Flask 에이전트·React 대시보드 모두
+로컬 통신만 사용, CDN 폰트/스크립트 없음). 인터넷 접속이 차단된 고객사 환경에 반입하려면
+**빌드는 인터넷이 되는 환경에서, 배포는 폐쇄망에서** 하는 방식을 권장합니다.
+
+```bash
+# ── 인터넷이 되는 빌드 서버에서 ──────────────────────────────
+cd frontend
+npm install && npm run build          # dist/ 생성 — 이후 이 산출물만 반입
+
+# Python 의존성도 미리 내려받아 오프라인 설치 패키지로 준비
+pip download -r ../agent/requirements.txt -d ../agent/vendor
+
+# ── 폐쇄망 반입 대상 (USB/사내 자료전송시스템 등) ─────────────
+lhams_project/
+├── agent/            # lhams_watchdog.py, requirements.txt, vendor/ (오프라인 wheel)
+├── frontend/dist/     # 빌드 산출물만 반입 (frontend/src, node_modules 불필요)
+├── nginx/, scripts/, systemd/
+
+# ── 폐쇄망 서버에서 ──────────────────────────────────────────
+pip install --no-index --find-links=agent/vendor -r agent/requirements.txt
+sudo bash scripts/setup_env.sh          # 패키지 저장소(yum/dnf)도 사내 미러 필요
+sudo bash scripts/install_services.sh
+sudo cp nginx/lhams.conf /etc/nginx/conf.d/ && sudo systemctl restart nginx
+```
+
+체크할 점:
+
+- 위 "세미나 데모 시나리오"의 악성코드 테스트는 이미 `wget` 없이 로컬에서 EICAR 문자열을
+  생성하도록 되어 있어 폐쇄망에서도 그대로 동작합니다.
+- `setup_env.sh`가 설치하는 OS 패키지(auditd, clamav 등)는 별도로 사내 yum/dnf 미러가
+  필요합니다 — 이 저장소 자체의 책임 범위 밖이므로 사내 인프라팀과 사전 협의하세요.
+- 리포지토리 루트의 `package.json`/`package-lock.json`(`@anthropic-ai/sdk`)은 LHAMS 서비스와
+  무관한 별도 파일이므로 폐쇄망 반입 목록에서 제외해도 됩니다.
 
 ## 운영 참고
 
