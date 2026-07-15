@@ -1,0 +1,36 @@
+// SOS 로그 패키징 — 노드 선택 · 진행 단계 · 결과 카드
+.sos-form{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.field{
+  label{display:block;font-size:11.5px;color:var(--muted);font-weight:700;margin-bottom:7px}
+  input[type=datetime-local]{
+    width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:10px 12px;outline:none;color-scheme:dark;
+  }
+}
+.node-picks{display:flex;gap:10px;flex-wrap:wrap}
+.npick{
+  display:flex;align-items:center;gap:8px;padding:9px 14px;border-radius:9px;border:1px solid var(--line);font-size:12.5px;font-weight:700;color:var(--muted);transition:.15s;
+  .nd{width:9px;height:9px;border-radius:50%}
+  &.on{border-color:rgba(76,141,255,.5);background:rgba(76,141,255,.09);color:var(--text)}
+}
+.sos-steps{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:16px}
+.sos-node{
+  border:1px solid var(--line-soft);border-radius:12px;padding:14px;background:var(--panel2);
+  .nn{font-weight:800;font-size:13px;display:flex;align-items:center;gap:8px}
+  ul{list-style:none;margin-top:12px;display:flex;flex-direction:column;gap:7px}
+  li{
+    display:flex;align-items:center;gap:8px;font-size:12px;color:var(--dim);font-family:var(--mono);
+    .ic{width:15px;height:15px;border-radius:50%;border:2px solid var(--line);flex-shrink:0;display:grid;place-items:center;font-size:9px}
+    &.doing{color:var(--warn); .ic{border-color:var(--warn);animation:spinB 1s linear infinite}}
+    &.done{color:var(--pass); .ic{border-color:var(--pass);background:rgba(53,201,142,.15); &::after{content:"✓"}}}
+    &.failed{color:var(--crit); .ic{border-color:var(--crit);background:rgba(255,93,93,.15); &::after{content:"✕"}}}
+  }
+}
+@keyframes spinB{to{transform:rotate(360deg)}}
+.sos-result{
+  margin-top:16px;display:none;align-items:center;gap:16px;padding:16px 18px;border-radius:12px;background:rgba(53,201,142,.07);border:1px solid rgba(53,201,142,.3);
+  &.show{display:flex;animation:fade .3s}
+  &.partial{background:rgba(247,179,43,.07);border-color:rgba(247,179,43,.3)}
+  .fn{font-family:var(--mono);font-size:13px;font-weight:700}
+  .fs{font-size:11.5px;color:var(--muted);margin-top:3px}
+}
+.timer{font-family:var(--mono);font-size:12px;color:var(--warn)}

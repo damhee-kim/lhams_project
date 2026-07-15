@@ -1,0 +1,21 @@
+// 디자인 토큰 — 색상·폰트·전역 리셋
+:root{
+  --bg:#0B1020; --panel:#131A2C; --panel2:#0F1526; --line:#223052; --line-soft:#1A2440;
+  --text:#E8EDF7; --muted:#8A97B5; --dim:#56618A;
+  --webmail:#4C8DFF; --spam:#F7B32B; --mailbrk:#FF5D5D; --archive:#35C98E;
+  --pass:#35C98E; --warn:#F7B32B; --crit:#FF5D5D; --pending:#56618A;
+  --mono:"JetBrains Mono","SF Mono",ui-monospace,Consolas,monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  background:var(--bg); color:var(--text);
+  font-family:"Pretendard Variable",Pretendard,"Noto Sans KR",-apple-system,"Malgun Gothic",sans-serif;
+  font-size:14px; letter-spacing:-0.01em;
+  background-image:radial-gradient(1200px 600px at 80% -10%, rgba(76,141,255,.07), transparent 60%);
+}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+input,select{font:inherit;color:var(--text)}
+::selection{background:rgba(76,141,255,.35)}
+
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}

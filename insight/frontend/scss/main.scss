@@ -1,0 +1,14 @@
+// Crinity Insight 대시보드 스타일 진입점.
+// 화면별 파티션으로 분리되어 있다 — 새 화면을 추가하면 파티션을 하나 더 만들고
+// 여기서 @forward 하나만 추가하면 된다. 컴파일: `npm run build:css` (sass 사용).
+@forward "tokens";
+@forward "layout";
+@forward "components";
+@forward "overview";
+@forward "node-endpoints";
+@forward "journey";
+@forward "sos";
+@forward "alerts";
+@forward "arch";
+@forward "toast";
+@forward "responsive";

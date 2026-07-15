@@ -1,0 +1,13 @@
+{
+  "name": "crinity-insight-frontend",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Crinity Insight 대시보드 스타일(SCSS) 빌드 — HTML은 컴파일된 style.css를 링크한다.",
+  "scripts": {
+    "build:css": "sass scss/main.scss:style.css --no-source-map --style=expanded",
+    "watch:css": "sass --watch scss/main.scss:style.css --no-source-map --style=expanded"
+  },
+  "devDependencies": {
+    "sass": "^1.77.0"
+  }
+}

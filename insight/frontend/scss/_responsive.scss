@@ -1,0 +1,8 @@
+// 반응형 — 1000px 이하 (태블릿/좁은 창)
+@media (max-width:1000px){
+  .grid4{grid-template-columns:repeat(2,1fr)} .grid2{grid-template-columns:1fr}
+  .sos-steps{grid-template-columns:repeat(2,1fr)} .th-grid{grid-template-columns:1fr}
+  .sidebar{width:70px} .logo .brand,.logo .sub,.nav button span.lb,.side-foot{display:none}
+  .jrow{grid-template-columns:1fr 130px}
+  .jrow .mini-line,.jrow .time{display:none}
+}

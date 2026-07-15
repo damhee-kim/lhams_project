@@ -6,3 +6,7 @@ out/
 .idea/
 .vscode/
 .DS_Store
+.venv/
+__pycache__/
+insight/frontend/style.css
+insight/frontend/*.css.map

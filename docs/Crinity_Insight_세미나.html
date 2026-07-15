@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Crinity Insight — 기능 분석 세미나</title>
+<style>
+  /* ─── Design tokens — 딥 다이빙 + 4솔루션 브랜드 색 ─── */
+  :root{
+    --navy:#0E1A2B; --navy2:#13223A; --panel:#182A42; --panel2:#1F3450;
+    --ink:#E8EFF7; --muted:#8CA0B8; --faint:#5A6B80;
+    --line:#26405F;
+    --web:#3E8EF7; --spam:#F2A93B; --mbk:#E5484D; --arc:#27B876;
+    --card-r:14px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--navy); color:var(--ink);
+    font-family:"Pretendard Variable",Pretendard,"Malgun Gothic","Apple SD Gothic Neo",system-ui,sans-serif;
+    line-height:1.65; font-size:16px;
+  }
+  ::selection{background:var(--web);color:#fff}
+
+  /* ─── 상단 내비 ─── */
+  nav{
+    position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:22px;
+    padding:14px 32px;background:rgba(14,26,43,.92);backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--line);
+  }
+  nav .brand{font-weight:800;letter-spacing:.04em;font-size:15px}
+  nav .brand em{font-style:normal;color:var(--web)}
+  nav a{color:var(--muted);text-decoration:none;font-size:13.5px;padding:4px 2px}
+  nav a:hover,nav a:focus-visible{color:var(--ink);outline:none}
+  nav a:focus-visible{outline:2px solid var(--web);outline-offset:3px;border-radius:4px}
+  .nav-links{display:flex;gap:20px;margin-left:auto;flex-wrap:wrap}
+
+  main{max-width:1080px;margin:0 auto;padding:0 28px 120px}
+  section{padding-top:96px}
+  .eyebrow{font-size:12.5px;font-weight:700;letter-spacing:.22em;color:var(--faint);text-transform:uppercase;margin-bottom:10px}
+  h2{font-size:30px;font-weight:800;letter-spacing:-.01em;margin-bottom:14px}
+  .lead{color:var(--muted);max-width:760px;margin-bottom:34px}
+
+  /* ─── 히어로 — 시그니처: 애니메이션 메일 노선도 ─── */
+  header.hero{padding:110px 0 70px;position:relative}
+  .hero .eyebrow{color:var(--web)}
+  .hero h1{font-size:clamp(34px,5.4vw,56px);font-weight:900;line-height:1.22;letter-spacing:-.02em;margin-bottom:18px}
+  .hero p.sub{color:var(--muted);font-size:18px;max-width:640px}
+  .hero .meta{margin-top:14px;font-size:13px;color:var(--faint)}
+
+  .metro{margin-top:64px;background:var(--navy2);border:1px solid var(--line);border-radius:var(--card-r);padding:44px 36px 30px;overflow-x:auto}
+  .metro-track{position:relative;display:flex;justify-content:space-between;min-width:640px}
+  .metro-track::before{content:"";position:absolute;left:4%;right:4%;top:13px;height:4px;background:var(--line);border-radius:2px}
+  .metro-track .fill{position:absolute;left:4%;top:13px;height:4px;background:linear-gradient(90deg,var(--web),var(--spam),var(--mbk));border-radius:2px;width:0;transition:width 2.4s cubic-bezier(.4,0,.2,1)}
+  .station{position:relative;flex:1;text-align:center}
+  .station .dotp{width:30px;height:30px;border-radius:50%;border:3px solid #fff;margin:0 auto 12px;background:var(--panel2);transition:background .5s, transform .4s}
+  .station.lit .dotp{transform:scale(1.12)}
+  .station.lit[data-c="web"] .dotp{background:var(--web)}
+  .station.lit[data-c="spam"] .dotp{background:var(--spam)}
+  .station.lit[data-c="mbk"] .dotp{background:var(--mbk)}
+  .station.lit[data-c="arc"] .dotp{background:var(--arc)}
+  .station b{display:block;font-size:14px}
+  .station small{color:var(--muted);font-size:12px}
+  .station .badge{display:inline-block;margin-top:6px;font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px;opacity:0;transform:translateY(4px);transition:all .4s}
+  .station.lit .badge{opacity:1;transform:none}
+  .badge.ok{background:rgba(39,184,118,.16);color:var(--arc)}
+  .badge.bad{background:rgba(229,72,77,.16);color:#FF8A8E}
+  .badge.wait{background:rgba(140,160,184,.14);color:var(--muted)}
+  .metro-caption{margin-top:26px;text-align:center;font-size:13px;color:var(--faint)}
+  .metro-caption code{color:var(--muted)}
+
+  /* ─── 공통 카드 ─── */
+  .grid{display:grid;gap:18px}
+  .g2{grid-template-columns:repeat(2,1fr)}
+  .g3{grid-template-columns:repeat(3,1fr)}
+  .card{background:var(--navy2);border:1px solid var(--line);border-radius:var(--card-r);padding:26px 26px 24px}
+  .card h3{font-size:17px;font-weight:800;margin-bottom:10px;display:flex;align-items:center;gap:10px}
+  .card p, .card li{font-size:14px;color:var(--muted)}
+  .card ul{list-style:none}
+  .card li{padding:5px 0 5px 18px;position:relative}
+  .card li::before{content:"";position:absolute;left:2px;top:14px;width:6px;height:6px;border-radius:50%;background:var(--faint)}
+  .pin{width:12px;height:12px;border-radius:50%;flex:none}
+  .pin.web{background:var(--web)} .pin.spam{background:var(--spam)}
+  .pin.mbk{background:var(--mbk)} .pin.arc{background:var(--arc)} .pin.gray{background:var(--faint)}
+
+  .strip{margin-top:22px;background:var(--panel);border:1px solid var(--line);border-radius:var(--card-r);padding:18px 24px;font-size:14.5px;font-weight:600}
+  .strip span{color:var(--web)}
+
+  /* ─── 아키텍처 ─── */
+  .arch{display:grid;grid-template-columns:1fr auto 1fr auto 1fr;gap:14px;align-items:stretch}
+  .tier{background:var(--navy2);border:1px solid var(--line);border-radius:var(--card-r);padding:22px}
+  .tier h3{font-size:15.5px;font-weight:800;margin-bottom:4px}
+  .tier .t-sub{font-size:12.5px;color:var(--faint);margin-bottom:14px}
+  .tier .row{display:flex;align-items:center;gap:9px;background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;margin-bottom:8px}
+  .arrow{align-self:center;text-align:center;color:var(--faint);font-size:11.5px;line-height:1.4}
+  .arrow b{display:block;font-size:20px;color:var(--muted)}
+  #arch h3.web{color:var(--web)} #arch h3.spam{color:var(--spam)} #arch h3.arc{color:var(--arc)}
+
+  /* ─── 모듈 탭 ─── */
+  .tabs{display:flex;gap:10px;margin-bottom:22px;flex-wrap:wrap}
+  .tab{border:1px solid var(--line);background:var(--navy2);color:var(--muted);border-radius:99px;padding:9px 20px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .2s}
+  .tab:hover{color:var(--ink)}
+  .tab.on{background:var(--panel2);color:var(--ink);border-color:var(--web)}
+  .tab:focus-visible{outline:2px solid var(--web);outline-offset:2px}
+  .mod{display:none}
+  .mod.on{display:block;animation:fade .35s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  .whr{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:22px}
+  .whr .card h3{font-size:14px;letter-spacing:.05em}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;background:var(--navy2);border-radius:var(--card-r);overflow:hidden}
+  th,td{padding:11px 14px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:var(--panel);font-size:12.5px;letter-spacing:.06em;color:var(--muted)}
+  td:first-child{white-space:nowrap;font-weight:700}
+  tr:last-child td{border-bottom:none}
+  td .ok{color:var(--arc);font-weight:800} td .no{color:#FF8A8E;font-weight:800}
+  .tbl-wrap{border:1px solid var(--line);border-radius:var(--card-r);overflow-x:auto;overflow-y:hidden}
+
+  .states{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0 4px}
+  .state{border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:10px 16px;font-size:13px}
+  .state b{display:block;font-size:13.5px;margin-bottom:2px}
+
+  /* ─── 리뷰 로드맵 ─── */
+  .steps{counter-reset:s}
+  .step{display:grid;grid-template-columns:52px 1fr;gap:16px;padding:18px 0;border-bottom:1px solid var(--line)}
+  .step:last-child{border-bottom:none}
+  .step .num{counter-increment:s;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;color:#fff}
+  .step .num::before{content:counter(s)}
+  .step h3{font-size:15.5px;font-weight:800;margin-bottom:4px}
+  .step h3 code{font-size:13px;background:var(--panel);border:1px solid var(--line);padding:1px 8px;border-radius:6px;color:var(--muted);margin-right:8px}
+  .step p{font-size:14px;color:var(--muted)}
+  .n1{background:var(--web)} .n2{background:var(--mbk)} .n3{background:var(--spam)}
+  .n4{background:var(--arc)} .n5{background:var(--faint)} .n6{background:var(--faint)}
+
+  /* ─── 데모 & 임팩트 ─── */
+  .impact{display:grid;grid-template-columns:1.15fr .85fr;gap:22px}
+  .demo{display:flex;gap:14px;align-items:flex-start;padding:14px 0;border-bottom:1px solid var(--line)}
+  .demo:last-child{border-bottom:none}
+  .demo .tag{flex:none;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:4px 11px;font-weight:800;font-size:12.5px}
+  .demo b{font-size:14.5px}
+  .demo p{font-size:13px;color:var(--muted)}
+  .stat{background:var(--navy2);border:1px solid var(--line);border-radius:var(--card-r);padding:20px 24px;margin-bottom:14px}
+  .stat .big{font-size:40px;font-weight:900;letter-spacing:-.02em;line-height:1.1}
+  .stat .big.web{color:var(--web)} .stat .big.spam{color:var(--spam)} .stat .big.arc{color:var(--arc)}
+  .stat small{color:var(--muted);font-size:13px}
+
+  footer{border-top:1px solid var(--line);margin-top:110px;padding:34px 28px;color:var(--faint);font-size:13px;text-align:center}
+
+  @media (max-width:840px){
+    .g2,.g3,.whr,.impact{grid-template-columns:1fr}
+    .arch{grid-template-columns:1fr}
+    .arrow b{transform:rotate(90deg)}
+    nav .nav-links{display:none}
+    section{padding-top:72px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{transition:none!important;animation:none!important}
+    .metro-track .fill{transition:none}
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="brand">CRINITY <em>INSIGHT</em> · 세미나</span>
+  <div class="nav-links">
+    <a href="#why">배경</a><a href="#constraints">제약</a><a href="#arch">아키텍처</a>
+    <a href="#modules">핵심 모듈</a><a href="#screens">화면</a><a href="#review">로직 검증</a><a href="#impact">데모·효과</a>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <main style="padding-bottom:0">
+    <div class="eyebrow">통합 메일 사전 관제 · 지속보안 자동화 플랫폼</div>
+    <h1>네 개의 메일 솔루션,<br>하나의 관제 노선으로</h1>
+    <p class="sub">Webmail · SpamBreaker · MailBreaker · Archiving — 파이프라인화된 4개 장비의 가시성을 Message-ID 하나로 잇는 Crinity Insight의 구현 기능 전체 분석.</p>
+    <div class="meta">2026. 07 · 개발팀 · 프로토타입 v1.2 기준 · 단일 HTML · 외부 의존성 0건 · <b style="color:var(--arc)">insight/ 폴더에 FastAPI + SSE 실행 가능한 백엔드로 구현 완료</b></div>
+
+    <!-- 시그니처: 애니메이션 메일 노선도 -->
+    <div class="metro" id="metro" aria-label="메일 여정 노선도 데모">
+      <div class="metro-track">
+        <div class="fill" id="metroFill"></div>
+        <div class="station" data-c="web"><div class="dotp"></div><b>Webmail 발신</b><small>SMTP 접수</small><br><span class="badge ok">OK · 0.2s</span></div>
+        <div class="station" data-c="spam"><div class="dotp"></div><b>SpamBreaker 통과</b><small>스팸 필터</small><br><span class="badge ok">OK · 1.1s</span></div>
+        <div class="station" data-c="mbk"><div class="dotp"></div><b>MailBreaker 격리</b><small>DLP 검사</small><br><span class="badge bad">QUARANTINED · 개인정보 유발</span></div>
+        <div class="station" data-c="arc"><div class="dotp"></div><b>Archiving 대기</b><small>보관</small><br><span class="badge wait">PENDING</span></div>
+      </div>
+      <div class="metro-caption"><code>Message-ID: &lt;a1b2c3@crinity.co.kr&gt;</code> 한 통의 여정 — 차단 발생 후 3초 내 대시보드 반영</div>
+    </div>
+  </main>
+</header>
+
+<main>
+
+  <!-- 01 배경 -->
+  <section id="why">
+    <div class="eyebrow">01 · Why</div>
+    <h2>왜 만들었나 — 파이프라인화 된 가시성</h2>
+    <p class="lead">4개 솔루션이 각각 독립 동작해, 메일 한 통 처리 전방을 아무도 하나로 보지 못했다. 같은 원인이 두 방향의 비용으로 흘러들어온다.</p>
+    <div class="grid g2">
+      <div class="card">
+        <h3><span class="pin mbk"></span>고객사 — CS 티켓 폭증</h3>
+        <ul>
+          <li>메일 지연·미도달 시 어느 장비에서 막혔는지 알 수 없음</li>
+          <li>차단 사유(스팸? DLP? 정책?)를 확인할 방법이 없어 즉시 고객콜센터 문의</li>
+          <li>"내 메일 어디 갔나요" 질의가 CS의 절반 이상</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3><span class="pin spam"></span>엔지니어 — MTTR 지연</h3>
+        <ul>
+          <li>장애 원인 파악 시 4개 장비에 각각 SSH 접속해 grep 교차 검증</li>
+          <li>로그 수집만도 장비당 10분, 총 40분 이상 소요</li>
+          <li>수기의 수집 과정은 누락·오탈 등 휴먼 에러 의존</li>
+        </ul>
+      </div>
+    </div>
+    <div class="strip">→ 단순 로그 뷰어가 아니라, 가시성 파이프라인을 해결하는 <span>"메타 관제 + 지속보안 자동화 엔진"</span>이 필요했다.</div>
+  </section>
+
+  <!-- 02 제약 -->
+  <section id="constraints">
+    <div class="eyebrow">02 · Constraints</div>
+    <h2>모든 기술 선택을 결정한 3가지 제약</h2>
+    <p class="lead">기술 스택은 여기서 드러난다 — 아래 3개 제약을 통과하지 못하는 선택지는 처음부터 후보가 아니었다.</p>
+    <div class="grid g3">
+      <div class="card">
+        <h3><span class="pin web"></span>폐쇄망 고객사</h3>
+        <p>공공·금융 고객 다수. 외부 SaaS·인터넷 저장소 접근 불가.</p>
+        <ul><li>Datadog류 SaaS APM 배제</li><li>OS 내장 도구(Python 3 · Bash · tar · top · df)만 조합</li></ul>
+      </div>
+      <div class="card">
+        <h3><span class="pin spam"></span>상용 장비 Zero-Impact</h3>
+        <p>4개 솔루션은 이미 운영 중인 상용 서비스. 사이드카·패키지 설치 최소화.</p>
+        <ul><li>무거운 수집기(Filebeat + ES) 배제</li><li>초경량 자체 Agent — CPU &lt; 5%, MEM &lt; 100MB</li></ul>
+      </div>
+      <div class="card">
+        <h3><span class="pin arc"></span>도메인 특화 데이터</h3>
+        <p>Message-ID로 이어지는 "메일 여정"이라는 도메인 개념이 핵심.</p>
+        <ul><li>범용 로그 검색이 아닌 여정 Join 엔진 직접 구현</li><li>격리 해제 등 조치까지 솔루션 API 연동</li></ul>
+      </div>
+    </div>
+    <div class="strip">발화점 재발명 없이 — 도메인 로직(Join · Timeout · 룰)과 조치 연동 · 신속 UX만 직접 만든다.</div>
+  </section>
+
+  <!-- 03 아키텍처 -->
+  <section id="arch">
+    <div class="eyebrow">03 · Architecture</div>
+    <h2>3-Tier 마이크로 아키텍처</h2>
+    <p class="lead">핵심 설계는 <b style="color:var(--ink)">느슨한 결합</b> — 중앙서버가 죽어도 4개 상용 솔루션의 메일 유발은 전혀 영향(데모 시나리오 D-4로 증명).</p>
+    <div class="arch">
+      <div class="tier">
+        <h3 class="web">① Edge Layer</h3>
+        <div class="t-sub">각 솔루션 서버에 초경량 Python Agent 상주</div>
+        <div class="row"><span class="pin web"></span>Webmail Agent</div>
+        <div class="row"><span class="pin spam"></span>SpamBreaker Agent</div>
+        <div class="row"><span class="pin mbk"></span>MailBreaker Agent</div>
+        <div class="row"><span class="pin arc"></span>Archiving Agent</div>
+      </div>
+      <div class="arrow"><b>→</b>경량화 JSON<br>(단방향 push)</div>
+      <div class="tier">
+        <h3 class="spam">② Central Layer</h3>
+        <div class="t-sub">FastAPI 중앙 관제 서버</div>
+        <div class="row">Message-ID Join 엔진</div>
+        <div class="row">Timeout 병목 탐지</div>
+        <div class="row">SOS Job 상태 머신</div>
+        <div class="row">경보 룰 · Webhook 발송</div>
+        <div class="row">RBAC · 감사 로그</div>
+      </div>
+      <div class="arrow"><b>→</b>REST API<br>(3초 폴링)</div>
+      <div class="tier">
+        <h3 class="arc">③ Frontend</h3>
+        <div class="t-sub">React 관리자 대시보드</div>
+        <div class="row">관제 현황</div>
+        <div class="row">여정 노선도</div>
+        <div class="row">SOS 패키징</div>
+        <div class="row">여정 경보</div>
+        <div class="row">권한별 화면 분기</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 04 핵심 모듈 -->
+  <section id="modules">
+    <div class="eyebrow">04 · Core Modules</div>
+    <h2>핵심 기능 3대 모듈</h2>
+    <p class="lead">항상 똑같은 모듈별 What / How / Result의 로직 분해를 확인하세요.</p>
+    <div class="tabs" role="tablist">
+      <button class="tab on" role="tab" aria-selected="true" data-m="m1">M1 · 메일 여정 추적기</button>
+      <button class="tab" role="tab" aria-selected="false" data-m="m2">M2 · 원클릭 SOS 패키징</button>
+      <button class="tab" role="tab" aria-selected="false" data-m="m3">M3 · 여정 장애 경보</button>
+    </div>
+
+    <!-- M1 -->
+    <div class="mod on" id="m1">
+      <div class="whr">
+        <div class="card"><h3><span class="pin web"></span>WHAT</h3><p>독립 서버를 통과하는 개별 메일의 상태(수신·스팸 통과·DLP 차단·보관)를 하나의 UI에서 진행철 노선도 타임라인으로 시각화.</p></div>
+        <div class="card"><h3><span class="pin spam"></span>HOW</h3><p>Edge Agent가 정규식으로 Message-ID·상태만 추출 → 중앙서버가 Message-ID를 PK로 4개 서버 데이터를 Join·캐싱 → React가 경로·지연시간 렌더링.</p></div>
+        <div class="card"><h3><span class="pin arc"></span>RESULT</h3><p>고객사가 스스로 차단 사유 확인 → CS 티켓 50%↓. 구축한 로그 추적 20분 → 10초.</p></div>
+      </div>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>ID</th><th>세부 기능</th><th>핵심 로직</th><th>계층</th></tr></thead>
+        <tbody>
+          <tr><td>M1-F1</td><td>실시간 로그 감시</td><td>tail 방식 추적, 로테이션 대응(inode 변화 감지 후 재오픈)</td><td>Edge</td></tr>
+          <tr><td>M1-F2</td><td>Regex 이벤트 추출</td><td>Message-ID·Timestamp·상태·사유만 추출. 매칭 실패 라인은 즉시 폐기(본문 미저장)</td><td>Edge</td></tr>
+          <tr><td>M1-F3</td><td>경량화 JSON 전송</td><td>이벤트당 ~200B, 1초 배치 push. 실패 시 로컬 스풀 후 재전송</td><td>Edge</td></tr>
+          <tr><td>M1-F4</td><td>Message-ID Join</td><td>message_id 기준 병합·여정 문서 갱신. 멱등 처리 + LRU·TTL 캐시(72h)</td><td>Backend</td></tr>
+          <tr><td>M1-F5</td><td>Timeout 병목 탐지</td><td>다음 노드 이벤트가 60초 내 미도달 시 해당 구간 DELAYED 자체 판정</td><td>Backend</td></tr>
+          <tr><td>M1-F6</td><td>여정 검색 API</td><td>keyword·status 조건 검색 + 페이지네이션</td><td>Backend</td></tr>
+          <tr><td>M1-F7</td><td>노선도 타임라인 렌더링</td><td>역(노드)·구간(지연)·차단 사연 시각화 + 격리 해제 버튼(RBAC)</td><td>Frontend</td></tr>
+          <tr><td>M1-F8</td><td>장비 연결 설정(IP·Port)</td><td>스팸브레이커·메일브레이커·아카이빙 실제 주소를 관리자가 직접 입력, 저장 시 서버가 실제 TCP 연결로 통신 여부 판정</td><td>Backend·Frontend</td></tr>
+        </tbody>
+      </table></div>
+      <div class="states">
+        <div class="state"><b style="color:var(--arc)">OK</b>정상 통과</div>
+        <div class="state"><b style="color:#FF8A8E">QUARANTINED</b>격리 (여정 폐기)</div>
+        <div class="state"><b style="color:var(--spam)">DELAYED</b>Timeout 엔진 판정 정체</div>
+        <div class="state"><b style="color:var(--muted)">PENDING</b>미도달</div>
+        <div class="state"><b style="color:var(--web)">ARCHIVED</b>보관 완료</div>
+      </div>
+    </div>
+
+    <!-- M2 -->
+    <div class="mod" id="m2">
+      <div class="whr">
+        <div class="card"><h3><span class="pin web"></span>WHAT</h3><p>장애 시 즉시 4개 서버의 로그·리소스 상태를 원클릭으로 동시 수집·압축하는 자동화 도구.</p></div>
+        <div class="card"><h3><span class="pin spam"></span>HOW</h3><p>시간대 지정 → 중앙서버 비동기 fan-out → Agent×4 병렬 수집(로그·top·df) → 노드별 압축 업로드 → 중앙 병합 후 단일 파일 다운로드(manifest 동봉).</p></div>
+        <div class="card"><h3><span class="pin arc"></span>RESULT</h3><p>장비당 10분 × 4대 = 40분+ 소요였던 것을 1분 이내로. 휴먼 에러 원천 차단.</p></div>
+      </div>
+      <div class="states" style="margin-top:0">
+        <div class="state"><b style="color:var(--web)">RUNNING</b>4개 노드 병렬 수집 진행</div>
+        <div class="state"><b style="color:var(--arc)">DONE</b>전 노드 성공 · 병합 완료</div>
+        <div class="state"><b style="color:var(--spam)">PARTIAL_DONE</b>일부 실패 — 성공분만 병합, 실패 노드 명시</div>
+        <div class="state"><b style="color:#FF8A8E">FAILED</b>전 노드 실패 · 재시도 안내</div>
+      </div>
+      <h3 style="font-size:16px;font-weight:800;margin:26px 0 12px">M2-F9 · 저장 경로 설정 — 입력 검증 6케이스</h3>
+      <p style="font-size:13.5px;color:var(--muted);margin-bottom:14px">경로 값은 그대로 <code>mkdir</code>·<code>tar</code> 인자로 들어간다 — 명령 주입·Path Traversal의 최우선 표적. 화이트리스트 위주로 방어한다.</p>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>케이스</th><th>입력 예</th><th>판정</th><th>근거</th></tr></thead>
+        <tbody>
+          <tr><td>정상 절대 경로</td><td>/data/insight/sos</td><td><span class="ok">통과</span></td><td>절대 경로 + 허용 문자만 사용</td></tr>
+          <tr><td>상대 경로</td><td>data/sos</td><td><span class="no">거부</span></td><td>절대 경로 강제 — 실행 위치 의존 차단</td></tr>
+          <tr><td>시스템 디렉토리</td><td>/etc/sos</td><td><span class="no">거부</span></td><td>금지 디렉토리 목록(/etc, /boot 등)</td></tr>
+          <tr><td>Path Traversal</td><td>/data/../etc</td><td><span class="no">거부</span></td><td>'..' 포함 시 즉시 거부</td></tr>
+          <tr><td>명령 주입 문자</td><td>/data;rm -rf</td><td><span class="no">거부</span></td><td>화이트리스트 [A-Za-z0-9/_.-] 외 전부 거부</td></tr>
+          <tr><td>비허용 문자(한글 등)</td><td>/데이터/sos</td><td><span class="no">거부</span></td><td>화이트리스트 위치 — 예외를 두지 않는다</td></tr>
+        </tbody>
+      </table></div>
+      <div class="strip">클라이언트 검증은 UX용일 뿐 — <span>서버측 동일 규칙 + 실제 쓰기·여유공간 검사(statvfs) + systemd ReadWritePaths 등록</span>이 실질 방어선. 변경은 ADMIN 권한 + 감사 기록, 진행 중 job에는 미적용.</div>
+    </div>
+
+    <!-- M3 -->
+    <div class="mod" id="m3">
+      <div class="whr">
+        <div class="card"><h3><span class="pin web"></span>WHAT</h3><p>장비 다운 전 메일 큐 적체·디스크 한계를 먼저 감지해 알림을 발송하는 사전 경보 체계.</p></div>
+        <div class="card"><h3><span class="pin spam"></span>HOW</h3><p>Agent 10초 주기 지표 수집 → 룰 평가 → 쿨다운·중복 제거 → Slack/Teams Webhook 발송 → 미조치 시 에스컬레이션 → 정상 복귀 시 RESOLVED 자동 통보.</p></div>
+        <div class="card"><h3><span class="pin arc"></span>RESULT</h3><p>고객이 장애를 인지하기 전에 크리니티가 먼저 움직이는 능동적(Proactive) 지속보안 체계로 격상.</p></div>
+      </div>
+      <div class="grid g2">
+        <div class="card">
+          <h3><span class="pin mbk"></span>룰 예시 — 문턱값을 잡는다</h3>
+          <ul>
+            <li>MailBreaker 큐 1,000건 초과 대기 → CRITICAL</li>
+            <li>디스크 사용률 90% 초과 → WARNING</li>
+            <li>CPU 지속 임계 초과 → WARNING (지속시간 조건)</li>
+            <li>Agent 하트비트 유실 → Watchdog가 노드 다운 여부 경보</li>
+            <li>장비 IP·Port 연결 끊김/복구(신규) → CRITICAL/INFO — 관리자가 등록한 주소로 실TCP 연결 재확인 실패 시</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3><span class="pin gray"></span>알림 폭주 막는 장치</h3>
+          <ul>
+            <li>쿨다운 — 동일 경보 반복 발송 억제</li>
+            <li>중복 제거 — 같은 원인의 경보 병합</li>
+            <li>에스컬레이션 — 미조치 시 단계 상향</li>
+            <li>RESOLVED — 정상 복귀를 자동으로 알려 잊음 정리</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 05 화면 -->
+  <section id="screens">
+    <div class="eyebrow">05 · Screens</div>
+    <h2>관리자 대시보드 — 6개 화면</h2>
+    <p class="lead">단일 HTML · 외부 의존성 0건 · jsdom 자동 테스트로 6화면 무오류 검증 완료. 목업 데이터의 필드명·구조는 FastAPI 응답 스키마와 1:1.</p>
+    <div class="grid g3">
+      <div class="card"><h3><span class="pin web"></span>SCR-01 관제 현황</h3><p>노드 헬스 카드 ×4 (CPU·MEM·DISK·QUEUE 게이지), 장비 연결 설정(IP·Port), 24h 처리량, 실시간 경보 피드</p><p style="margin-top:8px;font-size:12px;color:var(--faint)">FR-07 · 10</p></div>
+      <div class="card"><h3><span class="pin mbk"></span>SCR-02 메일 여정 추적</h3><p>검색 → 목록 → 노선도 타임라인(시그니처), 구간 지연 배지, 차단 사유, 격리 해제</p><p style="margin-top:8px;font-size:12px;color:var(--faint)">FR-01~04 · 11</p></div>
+      <div class="card"><h3><span class="pin spam"></span>SCR-03 SOS 패키징</h3><p>시간대 지정 → 원클릭 수집 → 노드별 진행 스텝 → 병합 결과 다운로드</p><p style="margin-top:8px;font-size:12px;color:var(--faint)">FR-05 · 06</p></div>
+      <div class="card"><h3><span class="pin arc"></span>SCR-04 여정 경보</h3><p>임계치 입력, Slack/Teams Webhook 등록·테스트 발송, 경보 이력</p><p style="margin-top:8px;font-size:12px;color:var(--faint)">FR-08~10</p></div>
+      <div class="card"><h3><span class="pin gray"></span>SCR-05 아키텍처</h3><p>Edge→Central→Frontend 3-Tier SVG 구성도, 데이터 흐름 (세미나 설명용)</p><p style="margin-top:8px;font-size:12px;color:var(--faint)">발표 지원</p></div>
+      <div class="card"><h3><span class="pin gray"></span>SCR-06 개발 가이드</h3><p>화면→요구사항→API 매핑, MOCK→REAL 전환 목록, React 18 + Vite 이관 구조</p><p style="margin-top:8px;font-size:12px;color:var(--faint)">개발 인수인계</p></div>
+    </div>
+    <h3 style="font-size:16px;font-weight:800;margin:34px 0 12px">핵심 API — 프로토타입 데이터 계약과 1:1</h3>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Method</th><th>Endpoint</th><th>목적</th><th>비고</th></tr></thead>
+      <tbody>
+        <tr><td style="color:var(--arc)">GET</td><td>/api/v1/journeys</td><td>조건별 메일 여정 목록 조회</td><td>keyword · status · 페이지네이션</td></tr>
+        <tr><td style="color:var(--arc)">GET</td><td>/api/v1/journeys/{msg_id}</td><td>특정 메일 상세 노드 조회</td><td>여정 문서(노드·지연·사유)</td></tr>
+        <tr><td style="color:var(--web)">POST</td><td>/api/v1/nodes/sos-package</td><td>4개 서버 대상 SOS 압축 요청</td><td>job_id 반환 · 상태 머신 추적</td></tr>
+        <tr><td style="color:#FF8A8E">POST</td><td>/api/v1/nodes/release</td><td>격리 메일 강제 해제</td><td>RBAC 검사 + 감사 로그 필수</td></tr>
+        <tr><td style="color:var(--arc)">GET</td><td>/api/v1/health</td><td>4개 Edge 리소스 상태 조회</td><td>CPU · MEM · DISK · QUEUE</td></tr>
+        <tr><td style="color:var(--web)">GET/PUT</td><td>/api/v1/settings/node-endpoints/{node}</td><td>장비 IP·Port 설정 및 실제 TCP 연결 확인 (신규)</td><td>ADMIN 권한 · 감사 로그 · 5초 주기 재확인</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <!-- 06 로직 검증 로드맵 -->
+  <section id="review">
+    <div class="eyebrow">06 · Code Review</div>
+    <h2>로직 검증 로드맵 — 어디부터 읽을 것인가</h2>
+    <p class="lead">프로토타입(crinity_insight_admin.html)은 §1~§9 섹션 주석 체계로 구성. 읽는 순서는 → <b style="color:var(--ink)">UI보다 데이터 계약과 상태 전이를 먼저 본다.</b></p>
+    <div class="card" style="padding:10px 26px">
+      <div class="steps">
+        <div class="step"><div class="num n1"></div><div><h3><code>§1 DATA</code>데이터 계약</h3><p>목업 상수의 필드명·구조가 API 스키마(설계서 §4.3)와 1:1인지 확인. 이후 모든 로직의 전제.</p></div></div>
+        <div class="step"><div class="num n2"></div><div><h3><code>§4 SCR-02</code>Join · Timeout 엔진</h3><p>여정 병합의 멱등성, 60초 Timeout 판정, 상태 전이(OK→QUARANTINED→…)가 도메인 규칙과 일치하는지. 플랫폼의 심장.</p></div></div>
+        <div class="step"><div class="num n3"></div><div><h3><code>§5 SCR-03</code>SOS 상태 머신</h3><p>RUNNING→DONE / PARTIAL_DONE / FAILED 전이와 부분 실패 처리, M2-F9 경로 검증 6케이스.</p></div></div>
+        <div class="step"><div class="num n4"></div><div><h3><code>§6 SCR-04</code>경보 룰</h3><p>임계치 평가·쿨다운·에스컬레이션·RESOLVED 조건. 오탐/미탐 경계가 핵심.</p></div></div>
+        <div class="step"><div class="num n5"></div><div><h3><code>§3 · §9</code>관제 갱신 주기</h3><p>3초 폴링 갱신 흐름과 라이브 시뮬레이션 타이머. 실구현 시 fetch로 치환되는 지점.</p></div></div>
+        <div class="step"><div class="num n6"></div><div><h3><code>§8 SCR-06</code>전환 체크리스트</h3><p>MOCK→REAL 전환 포인트(폴링·SSE·RBAC·감사 로그)가 빠짐없이 목록화됐는지 최종 대조.</p></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 07 데모 & 효과 -->
+  <section id="impact">
+    <div class="eyebrow">07 · Demo &amp; Impact</div>
+    <h2>라이브 데모 시나리오와 기대 효과</h2>
+    <div class="impact">
+      <div class="card" style="padding-top:12px;padding-bottom:12px">
+        <div class="demo"><span class="tag">D-1</span><div><b>격리 메일 추적</b><p>DLP 유발 메일 발송 → 여정 검색 → 3초 내 MailBreaker 격리 + 사유 표시</p></div></div>
+        <div class="demo"><span class="tag">D-2</span><div><b>SOS 수집</b><p>시간대 지정 → 원클릭 → 1분 내 4개 노드 병합 압축본 다운로드</p></div></div>
+        <div class="demo"><span class="tag">D-3</span><div><b>여정 경보</b><p>큐 1,000건 적체 모사 → 임계치 경보 + Slack Webhook 수신</p></div></div>
+        <div class="demo"><span class="tag">D-4</span><div><b>장애 격리 (Zero-Impact)</b><p>중앙서버 중지 → 4개 솔루션 메일 유발전 정상 확인</p></div></div>
+      </div>
+      <div>
+        <div class="stat"><div class="big web">10초</div><small>로그 추적 시간 — 기존 20분</small></div>
+        <div class="stat"><div class="big spam">1분</div><small>4개 노드 로그 수집 — 기존 40분+</small></div>
+        <div class="stat"><div class="big arc">50%↓</div><small>고객사 CS 티켓 — 차단 사유 시간 확인</small></div>
+      </div>
+    </div>
+    <div class="strip" style="margin-top:26px">다음 착수장 → <span>Sprint 1</span> 여정 추적 MVP(Agent F1~F3 + Join 엔진) → <span>Sprint 2</span> SOS·경보 실구현 → <span>Sprint 3</span> RBAC·감사 로그·systemd 배포·React 18 + Vite 이관</div>
+  </section>
+
+</main>
+
+<footer>
+  Crinity Insight — 기능 분석 세미나 · 산출물: 관리자 프로토타입 1식(6화면) · 설계 이미지 7종 · 명세 문서 4부 (v1.0 / v1.1 / v1.2 / v2.0)
+</footer>
+
+<script>
+  // 히어로 노선도 애니메이션: 로드 시 역이 순차 점등, 스크롤 복귀 시 재시작하지 않음 (성능 방지)
+  (function(){
+    var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var stations = document.querySelectorAll('#metro .station');
+    var fill = document.getElementById('metroFill');
+    function play(){
+      if(reduce){ stations.forEach(function(s){s.classList.add('lit')}); fill.style.width='63%'; return; }
+      fill.style.width='63%'; // 3번째 역(MailBreaker 격리)까지 진행
+      stations.forEach(function(s,i){
+        setTimeout(function(){ s.classList.add('lit'); }, 500 + i*650);
+      });
+    }
+    if(document.readyState==='complete') play();
+    else window.addEventListener('load', play);
+  })();
+
+  // 모듈 탭
+  document.querySelectorAll('.tab').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      document.querySelectorAll('.tab').forEach(function(b){ b.classList.remove('on'); b.setAttribute('aria-selected','false'); });
+      document.querySelectorAll('.mod').forEach(function(m){ m.classList.remove('on'); });
+      btn.classList.add('on'); btn.setAttribute('aria-selected','true');
+      document.getElementById(btn.dataset.m).classList.add('on');
+    });
+  });
+</script>
+</body>
+</html>

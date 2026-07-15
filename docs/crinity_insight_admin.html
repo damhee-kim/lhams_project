@@ -319,13 +319,19 @@ table.alert-table td.mono{font-size:11.5px}
  * 목업 데이터. 필드명·구조는 설계서 §4.3 데이터 스키마와 1:1 — 실구현 시
  * 이 상수들을 fetch 응답으로 치환하면 렌더 계층은 수정 없이 동작한다.
  * MOCK: 전부 하드코딩 / REAL: GET /api/v1/journeys, /health, /alerts */
+/* host를 하드코딩하지 않는다 — 스팸브레이커/메일브레이커/아카이빙은 고객사마다
+ * 실제 IP·Port가 다르므로 §3-1 "장비 연결 설정" 카드에서 관리자가 직접 입력한다.
+ * 실구현: insight/backend/app/state.py의 node_endpoints (host="", port=null 기본값). */
 const NODES = [
-  {id:"Webmail",     name:"웹메일",     host:"10.10.1.11", color:"var(--webmail)", hex:"#4C8DFF"},
-  {id:"SpamBreaker", name:"스팸브레이커", host:"10.10.1.12", color:"var(--spam)",    hex:"#F7B32B"},
-  {id:"MailBreaker", name:"메일브레이커", host:"10.10.1.13", color:"var(--mailbrk)", hex:"#FF5D5D"},
-  {id:"Archiving",   name:"아카이빙",   host:"10.10.1.14", color:"var(--archive)", hex:"#35C98E"},
+  {id:"Webmail",     name:"웹메일",     host:"127.0.0.1 (로컬)", color:"var(--webmail)", hex:"#4C8DFF"},
+  {id:"SpamBreaker", name:"스팸브레이커", host:"미설정",           color:"var(--spam)",    hex:"#F7B32B"},
+  {id:"MailBreaker", name:"메일브레이커", host:"미설정",           color:"var(--mailbrk)", hex:"#FF5D5D"},
+  {id:"Archiving",   name:"아카이빙",   host:"미설정",             color:"var(--archive)", hex:"#35C98E"},
 ];
 const nodeById = id => NODES.find(n=>n.id===id);
+const CONFIGURABLE_NODES = ["SpamBreaker","MailBreaker","Archiving"];
+let nodeEndpoints = Object.fromEntries(CONFIGURABLE_NODES.map(id=>[id,{host:'',port:''}]));
+let nodeConnected = {Webmail:true, SpamBreaker:null, MailBreaker:null, Archiving:null};
 
 let health = {
   Webmail:     {cpu:23, mem:61, disk:72, queue:12},
@@ -415,6 +421,11 @@ const views = {};
 views.overview = () => {
   const v = el('div','view active');
   v.innerHTML = `
+    <div class="card" style="margin-bottom:14px">
+      <h3>장비 연결 설정 (IP · Port) — 통신 여부에 따라 관리자가 직접 설정 (신규)</h3>
+      <div id="nodeEndpointRows" style="display:flex;flex-direction:column;gap:10px"></div>
+      <div class="hint" style="margin-top:10px">스팸브레이커·메일브레이커·아카이빙은 고객사마다 실제 장비의 IP·Port가 다르므로 하드코딩하지 않고 직접 입력합니다. 실구현에서는 저장 시 서버가 그 주소로 실제 TCP 연결을 시도해 통신 가능 여부를 판정합니다(insight/backend). 이 목업에서는 저장 버튼 클릭 시 연결 시도를 <b>랜덤 시뮬레이션</b>합니다. 웹메일은 이 서버 자신이므로 설정이 필요 없습니다.</div>
+    </div>
     <div class="grid4" id="healthCards"></div>
     <div class="grid2 section-gap">
       <div class="card">
@@ -432,19 +443,65 @@ views.overview = () => {
       </div>
     </div>`;
   content.replaceChildren(v);
-  renderHealth(); renderChart(); renderFeed();
+  renderNodeEndpointRows(); renderHealth(); renderChart(); renderFeed();
 };
+
+/**
+ * 장비 연결 설정 카드 — 실구현 매핑: GET/PUT /api/v1/settings/node-endpoints/{node}
+ * 목업이므로 실제 TCP 연결 대신 setTimeout으로 결과를 랜덤 시뮬레이션한다(§9 참고 패턴과 동일).
+ */
+function renderNodeEndpointRows(){
+  const wrap = $('#nodeEndpointRows'); if(!wrap) return;
+  wrap.replaceChildren(...CONFIGURABLE_NODES.map(nid=>{
+    const n = nodeById(nid);
+    const ep = nodeEndpoints[nid];
+    const c = nodeConnected[nid];
+    const badge = !ep.host ? '<span class="chip pending">미설정</span>'
+                : c===true ? '<span class="chip pass">연결됨</span>'
+                : c===false ? '<span class="chip crit">연결 끊김</span>'
+                : '<span class="chip pending">확인 중</span>';
+    const row = el('div');
+    row.style.cssText = 'display:grid;grid-template-columns:130px 1fr 100px auto auto;gap:10px;align-items:center';
+    row.innerHTML = `
+      <div style="font-weight:700;font-size:13px"><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${n.hex};margin-right:7px"></i>${n.name}</div>
+      <input data-f="host" value="${ep.host}" placeholder="IP 또는 호스트명을 입력하세요 (예: 10.10.1.12)" spellcheck="false"
+        style="background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-family:var(--mono);font-size:12px">
+      <input data-f="port" type="number" min="1" max="65535" value="${ep.port}" placeholder="Port"
+        style="background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-family:var(--mono);font-size:12px">
+      <span data-badge>${badge}</span>
+      <button class="btn ghost" data-save>저장 · 연결 확인</button>`;
+    row.querySelector('[data-save]').onclick = ()=>{
+      const host = row.querySelector('[data-f="host"]').value.trim();
+      const port = row.querySelector('[data-f="port"]').value;
+      if(!host || !port){ toast('IP·Port를 모두 입력하세요.','err'); return; }
+      nodeEndpoints[nid] = {host, port};
+      nodeConnected[nid] = null;
+      n.host = `${host}:${port}`;
+      renderNodeEndpointRows();
+      toast(`PUT /api/v1/settings/node-endpoints/${nid} → 연결 확인 중… (실TCP 연결 시도)`, 'ok');
+      setTimeout(()=>{
+        // MOCK: 실구현은 asyncio.open_connection 실제 결과. 목업은 70% 확률로 성공 시뮬레이션.
+        nodeConnected[nid] = Math.random() < 0.7;
+        renderNodeEndpointRows(); renderHealth();
+        toast(`${n.name} ${nodeConnected[nid] ? '연결됨' : '연결 안 됨(응답 없음)'}`, nodeConnected[nid] ? 'ok' : 'err');
+      }, 700);
+    };
+    return row;
+  }));
+}
 
 function renderHealth(){
   const wrap = $('#healthCards'); if(!wrap) return;
   wrap.replaceChildren(...NODES.map(n=>{
     const h = health[n.id];
+    const disconnected = CONFIGURABLE_NODES.includes(n.id) && nodeConnected[n.id]===false;
     const cls = p => p>=90?'hot':p>=80?'warm':'';
     const qcls = h.queue>=1000?'hot':h.queue>=500?'warm':'';
     const card = el('div','card node-card');
     card.style.setProperty('--nc', n.color);
+    if(disconnected) card.style.opacity = '.55';
     card.innerHTML = `
-      <div class="name">${n.name}<span class="st">${h.disk>=90||h.queue>=1000?'<span class="chip crit">경보</span>':h.disk>=80?'<span class="chip warn">주의</span>':'<span class="chip pass">정상</span>'}</span></div>
+      <div class="name">${n.name}<span class="st">${disconnected?'<span class="chip crit">연결 끊김</span>':h.disk>=90||h.queue>=1000?'<span class="chip crit">경보</span>':h.disk>=80?'<span class="chip warn">주의</span>':'<span class="chip pass">정상</span>'}</span></div>
       <div class="host">${n.id} · ${n.host}</div>
       <div class="gauges">
         ${[['CPU',h.cpu],['MEM',h.mem],['DISK',h.disk]].map(([k,p])=>`
@@ -933,6 +990,7 @@ views.dev = () => {
         <thead>${trow(['화면','충족 요구사항','핵심 API','시그니처 컴포넌트/함수'],1)}</thead>
         <tbody>
           ${trow(['SCR-01 관제 현황','FR-07, FR-10','<span class="mono">GET /api/v1/health</span>','renderHealth · renderFeed'])}
+          ${trow(['SCR-01 장비 연결 설정 (신규)','비고: 통신 여부 기반 IP·Port 직접 설정','<span class="mono">GET/PUT /api/v1/settings/node-endpoints/{node}</span>','renderNodeEndpointRows (실TCP 연결 확인)'])}
           ${trow(['SCR-02 여정 추적','FR-01~04, FR-11','<span class="mono">GET /journeys · POST /nodes/release</span>','renderJDetail (노드별 타임라인)'])}
           ${trow(['SCR-03 SOS 패키징','FR-05, FR-06','<span class="mono">POST /nodes/sos-package + SSE</span>','runSos · renderSosSteps'])}
           ${trow(['SCR-04 여정 경보','FR-08~10','<span class="mono">룰 CRUD · Webhook 테스트</span>','views.alert · renderAlertRows'])}
@@ -953,6 +1011,7 @@ views.dev = () => {
           ${trow(['역할 하드코딩 ENGINEER (사이드바)','세션 로그인 + RBAC 미들웨어 (VIEWER/ENGINEER/ADMIN)','보안명세 §5.1'])}
           ${trow(['8초 후 데모 경보 (§9)','경보 SSE 스트림 구독','보안명세 §4'])}
           ${trow(['SOS 저장 설정 = 세션 메모리 (§5)','<span class="mono">PUT /settings/sos-storage</span> — 서버측 경로·쓰기·여유공간 검증 + ADMIN 권한 + 감사 기록','보안명세 §3.4'])}
+          ${trow(['장비 IP·Port 저장 · 연결 확인 랜덤(70%) 시뮬레이션 (§3-1, 신규)','<span class="mono">PUT /settings/node-endpoints/{node}</span> — 서버가 실제 TCP 연결(asyncio.open_connection)로 판정, 끊김/복구 시 경보 기록','보안명세 §1 확장 · insight/backend/app/simulate.py'])}
         </tbody>
       </table>
     </div>

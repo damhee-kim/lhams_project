@@ -1,0 +1,81 @@
+// 메일 사전 추적 — 검색 · 목록 · 노드 타임라인(사인은스)
+.searchbar{
+  display:flex;gap:10px;align-items:center;
+  input[type=text]{
+    flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:10px;
+    padding:11px 14px;font-size:13.5px;outline:none;transition:.15s;
+    &:focus{border-color:var(--webmail);box-shadow:0 0 0 3px rgba(76,141,255,.15)}
+  }
+}
+.filters{display:flex;gap:8px;margin-top:12px}
+.fchip{
+  padding:6px 13px;border-radius:20px;font-size:12px;font-weight:700;color:var(--muted);border:1px solid var(--line);transition:.15s;
+  &:hover{color:var(--text)}
+  &.on{background:rgba(76,141,255,.14);border-color:rgba(76,141,255,.5);color:#BBD4FF}
+}
+.jlist{margin-top:14px;display:flex;flex-direction:column;gap:8px}
+.jrow{
+  display:grid;grid-template-columns:110px 1fr 200px 130px;gap:14px;align-items:center;
+  padding:13px 16px;border-radius:11px;background:var(--panel);border:1px solid var(--line-soft);
+  cursor:pointer;transition:.15s;text-align:left;width:100%;
+  &:hover{border-color:var(--line);background:#17203A}
+  &.sel{border-color:rgba(76,141,255,.6);background:rgba(76,141,255,.08)}
+  .subj{font-weight:700;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .from{font-size:11.5px;color:var(--muted);font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px}
+  .mini-line{
+    display:flex;align-items:center;gap:0;
+    .md{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+    .ms{height:2px;width:16px;flex-shrink:0}
+  }
+  .time{font-family:var(--mono);font-size:11px;color:var(--dim);text-align:right}
+}
+
+.journey-detail{margin-top:16px}
+.jd-head{display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap; .subj{font-size:16px;font-weight:800}}
+.jd-meta{
+  display:grid;grid-template-columns:repeat(4,auto);gap:6px 28px;margin-top:12px;font-size:12.5px;
+  .k{color:var(--dim);font-size:11px;margin-bottom:2px}
+  .v{font-family:var(--mono);font-size:12px}
+}
+.transit{margin-top:26px;padding:30px 10px 10px;overflow-x:auto}
+.t-line{display:flex;align-items:flex-start;min-width:760px}
+.station{
+  display:flex;flex-direction:column;align-items:center;width:150px;flex-shrink:0;position:relative;
+  .s-dot{
+    width:22px;height:22px;border-radius:50%;border:4px solid var(--sc);background:var(--bg);
+    position:relative;z-index:2;transition:.3s;
+  }
+  .s-name{margin-top:10px;font-weight:800;font-size:13px}
+  .s-time{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-top:3px}
+  .s-detail{font-size:11px;color:var(--muted);margin-top:5px;text-align:center;line-height:1.5;max-width:140px}
+  &.reached .s-dot{background:var(--sc);box-shadow:0 0 14px color-mix(in srgb,var(--sc) 60%,transparent)}
+  &.blocked{
+    .s-dot{background:var(--crit);border-color:var(--crit);animation:blockPulse 1.4s infinite}
+    .s-detail{color:#FFB4B4}
+  }
+  &.pending{
+    .s-dot{border-color:var(--dim);border-style:dashed}
+    .s-name{color:var(--dim)}
+  }
+}
+@keyframes blockPulse{0%{box-shadow:0 0 0 0 rgba(255,93,93,.55)}70%{box-shadow:0 0 0 12px rgba(255,93,93,0)}100%{box-shadow:0 0 0 0 rgba(255,93,93,0)}}
+.segment{
+  flex:1;min-width:60px;height:22px;display:flex;align-items:center;position:relative;margin:0 -32px;
+  .track{height:6px;width:100%;border-radius:3px;background:linear-gradient(90deg,var(--c1),var(--c2))}
+  &.dead .track{background:repeating-linear-gradient(90deg,var(--line) 0 8px,transparent 8px 16px);height:3px}
+  .lat{
+    position:absolute;top:-24px;left:50%;transform:translateX(-50%);
+    font-family:var(--mono);font-size:10.5px;padding:2px 8px;border-radius:10px;
+    background:var(--panel2);border:1px solid var(--line);color:var(--muted);white-space:nowrap;
+    &.slow{color:var(--warn);border-color:rgba(247,179,43,.4)}
+  }
+}
+.reason-card{
+  margin-top:18px;padding:16px 18px;border-radius:12px;display:flex;gap:14px;align-items:flex-start;
+  background:rgba(255,93,93,.07);border:1px solid rgba(255,93,93,.25);
+  &.ok{background:rgba(53,201,142,.06);border-color:rgba(53,201,142,.25)}
+  &.warn{background:rgba(247,179,43,.07);border-color:rgba(247,179,43,.3)}
+  .rc-body{flex:1}
+  .rc-title{font-weight:800;font-size:13.5px;margin-bottom:4px}
+  .rc-desc{font-size:12.5px;color:var(--muted);line-height:1.65}
+}
