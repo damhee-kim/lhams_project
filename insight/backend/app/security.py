@@ -15,24 +15,46 @@ from fastapi import Header, HTTPException, Request
 
 from . import state
 
+_TOKEN_FILE = state.DATA_DIR / "admin_token.txt"
 _env_token = os.environ.get("INSIGHT_ADMIN_TOKEN")
-ADMIN_TOKEN = _env_token or secrets.token_urlsafe(18)
-TOKEN_WAS_GENERATED = _env_token is None
+
+
+def _resolve_token() -> tuple[str, str]:
+    """토큰 출처를 결정한다: env var > 이전에 생성해 둔 파일 > 새로 생성.
+
+    개발 중 서버를 자주 재시작하는데, 매번 새 랜덤 토큰을 만들면 방금 대시보드에
+    붙여넣은 토큰이 재시작 한 번에 무효화된다 — 그래서 파일에 이미 있으면 그 값을
+    그대로 재사용하고, 정말 최초 기동일 때만 새로 생성한다.
+    """
+    if _env_token:
+        return _env_token, "env"
+    if _TOKEN_FILE.exists():
+        saved = _TOKEN_FILE.read_text(encoding="utf-8").strip()
+        if saved:
+            return saved, "file"
+    return secrets.token_urlsafe(18), "generated"
+
+
+ADMIN_TOKEN, _TOKEN_SOURCE = _resolve_token()
 
 
 def announce_admin_token():
     print("=" * 64)
-    if TOKEN_WAS_GENERATED:
-        print("[Crinity Insight] INSIGHT_ADMIN_TOKEN 환경변수가 없어 임시 토큰을 생성했습니다.")
-    else:
+    if _TOKEN_SOURCE == "env":
         print("[Crinity Insight] INSIGHT_ADMIN_TOKEN 환경변수를 관리자 토큰으로 사용합니다.")
+    elif _TOKEN_SOURCE == "file":
+        print(f"[Crinity Insight] 이전에 발급된 관리자 토큰을 재사용합니다 ({_TOKEN_FILE}).")
+    else:
+        print("[Crinity Insight] 관리자 토큰이 없어 새로 생성했습니다 (다음 재시작부터는 이 값을 재사용합니다).")
     print(f"  관리자 토큰: {ADMIN_TOKEN}")
+    print(f"  파일 위치: {_TOKEN_FILE}")
     print("  대시보드 좌측 하단 '관리자 토큰' 입력란에 붙여넣어야 조작(격리 해제/SOS 실행/설정 변경)이 가능합니다.")
     print("=" * 64)
-    try:
-        (state.DATA_DIR / "admin_token.txt").write_text(ADMIN_TOKEN, encoding="utf-8")
-    except OSError:
-        pass
+    if _TOKEN_SOURCE != "file":
+        try:
+            _TOKEN_FILE.write_text(ADMIN_TOKEN, encoding="utf-8")
+        except OSError:
+            pass
 
 
 def require_admin_token(x_admin_token: str | None = Header(default=None)):

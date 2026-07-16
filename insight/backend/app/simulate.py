@@ -14,7 +14,7 @@ import time
 import uuid
 from datetime import datetime
 
-from . import state
+from . import db, state
 
 REVEAL_SCALE = 3.0  # 데모 관측성을 위해 노드 통과 반영을 몇 배 늘려서 화면에서 진행을 볼 수 있게 함
 
@@ -62,12 +62,15 @@ def new_journey() -> dict:
     sender, recipient, subject = random.choice(MAIL_TEMPLATES)
     now = time.time()
     mid = f"<{time.strftime('%Y%m%d.%H%M%S', time.localtime(now))}.{uuid.uuid4().hex[:6]}@crinity.com>"
+    pipeline = state.enabled_node_ids() or list(state.NODE_IDS)  # 전부 사용 안 함이면(설정 실수) 4개로 폴백
     outcome, block_node = _plan_outcome()
-    block_idx = state.NODE_IDS.index(block_node) if block_node else None
+    if block_node not in pipeline:
+        outcome, block_node = "ARCHIVED", None  # 차단 후보 노드 자체가 미사용이면 정상 통과로 취급
+    block_idx = pipeline.index(block_node) if block_node else None
 
     hops = []
     cumulative = 0.4
-    for idx, nid in enumerate(state.NODE_IDS):
+    for idx, nid in enumerate(pipeline):
         if block_idx is not None and idx > block_idx:
             hops.append({"node": nid, "status": "PENDING", "reveal_at": None})
             continue
@@ -126,7 +129,7 @@ def resolve_journey(j: dict, now: float):
         last = resolved[-1]
         if last["status"] in ("QUARANTINED", "DELAYED"):
             top_state = last["status"]
-        elif len(resolved) == len(state.NODE_IDS) and last["status"] == "PASS":
+        elif len(resolved) == len(j["hops"]) and last["status"] == "PASS":
             top_state = "ARCHIVED"
         else:
             top_state = "PENDING"
@@ -135,9 +138,12 @@ def resolve_journey(j: dict, now: float):
 
 def serialize_journey(j: dict, now: float) -> dict:
     resolved, top_state = resolve_journey(j, now)
+    meta = j["meta"]
+    if state.privacy_settings.get("mask_subject"):
+        meta = {**meta, "subject": state.mask_subject(meta["subject"])}
     return {
         "message_id": j["message_id"],
-        "meta": j["meta"],
+        "meta": meta,
         "state": top_state,
         "nodes": resolved,
     }
@@ -164,7 +170,10 @@ async def health_and_alert_loop():
     while True:
         await asyncio.sleep(3)
         for nid, h in state.health.items():
-            # 연결이 끊긴 설정 가능 노드는 값을 얼려서(마지막 값 유지) "실데이터 없음"을 정직하게 표현
+            # 사용 안 함으로 표시했거나 연결이 끊긴 노드는 값을 얼려서(마지막 값 유지)
+            # "실데이터 없음"을 정직하게 표현한다
+            if not state.node_enabled.get(nid, True):
+                continue
             if nid in state.CONFIGURABLE_NODES and not state.node_connected.get(nid):
                 continue
             h["cpu"] = min(99, max(5, h["cpu"] + random.randint(-3, 3)))
@@ -199,15 +208,21 @@ async def check_node_endpoint_now(node_id: str) -> bool:
 
 
 async def connectivity_check_loop():
-    """스팸브레이커·메일브레이커·아카이빙에 실제 TCP 연결을 시도해 통신 여부를 판정한다.
+    """웹메일·스팸브레이커·메일브레이커·아카이빙에 실제 TCP 연결을 시도해 통신 여부를 판정한다.
 
     관리자가 대시보드에서 입력한 IP·Port를 그대로 사용하므로, 실제 장비를
     가리키면 진짜 연결 성공/실패가 그대로 반영된다(물리 장비가 없는 이 데모
     환경에서는 대개 실패하며, 그 사실 자체를 정직하게 보여주는 것이 목적).
+    사용 안 함으로 표시된 노드는 검사 대상에서 제외한다.
     """
     while True:
         changed = False
         for nid in state.CONFIGURABLE_NODES:
+            if not state.node_enabled.get(nid, True):
+                if state.node_connected.get(nid) is not None:
+                    state.node_connected[nid] = None
+                    changed = True
+                continue
             ep = state.node_endpoints[nid]
             was = state.node_connected.get(nid)
             now_ok = await _check_tcp(ep["host"], ep["port"])
@@ -232,6 +247,7 @@ def _push_alert(node_id, sev, msg, ch=None):
     }
     state.alerts.insert(0, entry)
     del state.alerts[300:]
+    db.insert_alert(entry)  # SQLite에 실제 저장 — 재시작해도 이력 유지
     return entry
 
 
@@ -240,6 +256,8 @@ def _evaluate_alert_rules():
     th = state.thresholds
     cooldown = th.get("cooldown_sec", 45)
     for nid, h in state.health.items():
+        if not state.node_enabled.get(nid, True):
+            continue  # 사용 안 함으로 표시된 노드는 애초에 평가 대상이 아님
         if nid in state.CONFIGURABLE_NODES and not state.node_connected.get(nid):
             continue  # 연결 끊긴 노드는 이미 별도의 연결 끊김 경보로 다루므로 임계치 평가는 건너뜀
         checks = [
@@ -263,7 +281,8 @@ async def journey_spawn_loop():
         await asyncio.sleep(random.uniform(8, 16))
         j = new_journey()
         state.journeys.insert(0, j)
-        del state.journeys[200:]
+        del state.journeys[200:]  # 인메모리 작업 캐시만 절단 — 전체 이력은 SQLite에 보관(보관기간 정책으로 별도 폐기)
+        db.upsert_journey(j)
         hour = datetime.fromtimestamp(j["created_at"]).hour
         state.live_hourly_processed[hour] += 1
         # 최종 상태는 아직 미확정(순차 공개 중)이므로 대략적인 계획을 기준으로 카운트
@@ -413,3 +432,18 @@ async def retention_cleanup_loop():
                     state.audit_append("SOS_RETENTION_PURGE", f.name, "system", "DELETED")
             except OSError:
                 pass
+
+
+async def privacy_retention_loop():
+    """리스크 체크리스트 "개인정보 처리 검토" 대응 — 메일 제목·주소가 담긴 여정을
+    무기한 보관하지 않는다. 기본 90일(고객사 정책에 맞춰 조정 가능)을 초과한
+    여정을 SQLite와 인메모리 캐시에서 함께 폐기한다. 실제 데이터가 쌓이는 운영
+    환경 기준 하루 1회로 충분하므로 데모에서도 같은 주기를 그대로 둔다."""
+    while True:
+        await asyncio.sleep(3600)
+        days = state.privacy_settings.get("journey_retention_days", 90)
+        removed = db.purge_journeys_older_than(days)
+        if removed:
+            cutoff = time.time() - days * 86400
+            state.journeys[:] = [j for j in state.journeys if j["created_at"] >= cutoff]
+            state.audit_append("PRIVACY_RETENTION_PURGE", f"{removed}건", "system", "DELETED")

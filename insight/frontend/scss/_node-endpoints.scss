@@ -13,4 +13,6 @@
 .ep-input{
   background:var(--panel2);border:1px solid var(--line);border-radius:8px;
   padding:8px 10px;font-family:var(--mono);font-size:12px;
+  &:disabled{opacity:.4}
 }
+.ep-row-disabled{ opacity:.55 }

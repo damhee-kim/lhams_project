@@ -10,3 +10,4 @@ out/
 __pycache__/
 insight/frontend/style.css
 insight/frontend/*.css.map
+insight/backend/vendor/

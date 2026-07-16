@@ -51,7 +51,7 @@
   .metro{margin-top:64px;background:var(--navy2);border:1px solid var(--line);border-radius:var(--card-r);padding:44px 36px 30px;overflow-x:auto}
   .metro-track{position:relative;display:flex;justify-content:space-between;min-width:640px}
   .metro-track::before{content:"";position:absolute;left:4%;right:4%;top:13px;height:4px;background:var(--line);border-radius:2px}
-  .metro-track .fill{position:absolute;left:4%;top:13px;height:4px;background:linear-gradient(90deg,var(--web),var(--spam),var(--mbk));border-radius:2px;width:0;transition:width 2.4s cubic-bezier(.4,0,.2,1)}
+  .metro-track .fill{position:absolute;left:4%;top:13px;height:4px;background:linear-gradient(90deg,var(--web),var(--mbk),var(--spam));border-radius:2px;width:0;transition:width 2.4s cubic-bezier(.4,0,.2,1)}
   .station{position:relative;flex:1;text-align:center}
   .station .dotp{width:30px;height:30px;border-radius:50%;border:3px solid #fff;margin:0 auto 12px;background:var(--panel2);transition:background .5s, transform .4s}
   .station.lit .dotp{transform:scale(1.12)}
@@ -180,8 +180,8 @@
       <div class="metro-track">
         <div class="fill" id="metroFill"></div>
         <div class="station" data-c="web"><div class="dotp"></div><b>Webmail 발신</b><small>SMTP 접수</small><br><span class="badge ok">OK · 0.2s</span></div>
-        <div class="station" data-c="spam"><div class="dotp"></div><b>SpamBreaker 통과</b><small>스팸 필터</small><br><span class="badge ok">OK · 1.1s</span></div>
         <div class="station" data-c="mbk"><div class="dotp"></div><b>MailBreaker 격리</b><small>DLP 검사</small><br><span class="badge bad">QUARANTINED · 개인정보 유발</span></div>
+        <div class="station" data-c="spam"><div class="dotp"></div><b>SpamBreaker 미도달</b><small>스팸 필터</small><br><span class="badge wait">PENDING</span></div>
         <div class="station" data-c="arc"><div class="dotp"></div><b>Archiving 대기</b><small>보관</small><br><span class="badge wait">PENDING</span></div>
       </div>
       <div class="metro-caption"><code>Message-ID: &lt;a1b2c3@crinity.co.kr&gt;</code> 한 통의 여정 — 차단 발생 후 3초 내 대시보드 반영</div>
@@ -225,8 +225,11 @@
     <div class="grid g3">
       <div class="card">
         <h3><span class="pin web"></span>폐쇄망 고객사</h3>
-        <p>공공·금융 고객 다수. 외부 SaaS·인터넷 저장소 접근 불가.</p>
-        <ul><li>Datadog류 SaaS APM 배제</li><li>OS 내장 도구(Python 3 · Bash · tar · top · df)만 조합</li></ul>
+        <p>공공·금융 고객 다수. 외부 SaaS·인터넷 저장소 접근 불가. 고객사 DB가 이미 고정돼 있어
+        별도 DB 엔진을 들이거나 새 포트(예: PostgreSQL)를 열기도 어렵다.</p>
+        <ul><li>Datadog류 SaaS APM 배제</li><li>OS 내장 도구(Python 3 · Bash · tar · top · df)만 조합</li>
+        <li>DB는 <b style="color:var(--ink)">SQLite</b> 채택 — 별도 서버·포트 없이 파일 1개로 영속화(리스크 체크리스트 "DB 선정" 결론)</li>
+        <li>다중 고객사·서버 구축 시 사이트 식별(<code>INSIGHT_SITE_NAME/ID</code>) 배지로 "지금 어느 사이트인지" 혼동 방지</li></ul>
       </div>
       <div class="card">
         <h3><span class="pin spam"></span>상용 장비 Zero-Impact</h3>
@@ -293,7 +296,7 @@
     <!-- M1 -->
     <div class="mod on" id="m1">
       <div class="whr">
-        <div class="card"><h3><span class="pin web"></span>WHAT</h3><p>독립 서버를 통과하는 개별 메일의 상태(수신·스팸 통과·DLP 차단·보관)를 하나의 UI에서 진행철 노선도 타임라인으로 시각화.</p></div>
+        <div class="card"><h3><span class="pin web"></span>WHAT</h3><p>독립 서버를 통과하는 개별 메일의 상태(수신·DLP 검사·스팸 필터·보관)를 하나의 UI에서 진행철 노선도 타임라인으로 시각화.</p></div>
         <div class="card"><h3><span class="pin spam"></span>HOW</h3><p>Edge Agent가 정규식으로 Message-ID·상태만 추출 → 중앙서버가 Message-ID를 PK로 4개 서버 데이터를 Join·캐싱 → React가 경로·지연시간 렌더링.</p></div>
         <div class="card"><h3><span class="pin arc"></span>RESULT</h3><p>고객사가 스스로 차단 사유 확인 → CS 티켓 50%↓. 구축한 로그 추적 20분 → 10초.</p></div>
       </div>
@@ -307,7 +310,9 @@
           <tr><td>M1-F5</td><td>Timeout 병목 탐지</td><td>다음 노드 이벤트가 60초 내 미도달 시 해당 구간 DELAYED 자체 판정</td><td>Backend</td></tr>
           <tr><td>M1-F6</td><td>여정 검색 API</td><td>keyword·status 조건 검색 + 페이지네이션</td><td>Backend</td></tr>
           <tr><td>M1-F7</td><td>노선도 타임라인 렌더링</td><td>역(노드)·구간(지연)·차단 사연 시각화 + 격리 해제 버튼(RBAC)</td><td>Frontend</td></tr>
-          <tr><td>M1-F8</td><td>장비 연결 설정(IP·Port)</td><td>스팸브레이커·메일브레이커·아카이빙 실제 주소를 관리자가 직접 입력, 저장 시 서버가 실제 TCP 연결로 통신 여부 판정</td><td>Backend·Frontend</td></tr>
+          <tr><td>M1-F8</td><td>장비 연결 설정(IP·Port·사용 여부)</td><td>웹메일 포함 4개 노드 전체의 실제 주소를 관리자가 직접 입력, 저장 시 서버가 실제 TCP 연결로 통신 여부 판정. 노드별 "사용 여부" 토글로 고객사가 도입하지 않은 솔루션은 관제·SOS·경보 평가·여정 파이프라인에서 제외. IP·Port 형식 검증·연결 확인 자체도 "사용" 상태일 때만 수행 — 꺼둔 노드는 값이 남아 있어도 검증하지 않고 그대로 저장(재사용 대비). 실시간 갱신 중에도 입력 중인 값은 지워지지 않음(연결 상태 배지만 갱신)</td><td>Backend·Frontend</td></tr>
+          <tr><td>M1-F9</td><td>개인정보 보관·마스킹 정책</td><td>메일 제목·주소가 담긴 여정을 기본 90일 후 자동 폐기(1~3650일 조정 가능), 제목 마스킹 토글 지원 — 리스크 체크리스트 "개인정보 처리 검토" 대응</td><td>Backend</td></tr>
+          <tr><td>M1-F10</td><td>격리 해제 연동 지점(seam)</td><td>MailBreaker/SpamBreaker 실제 격리 해제 인터페이스가 아직 미확정 — release_adapter.py 한 곳만 교체하면 되도록 분리, 그 전까지는 로컬 상태만 변경하는 MOCK으로 동작(감사 로그에 미확정 사실 명시)</td><td>Backend</td></tr>
         </tbody>
       </table></div>
       <div class="states">
@@ -401,7 +406,9 @@
         <tr><td style="color:var(--web)">POST</td><td>/api/v1/nodes/sos-package</td><td>4개 서버 대상 SOS 압축 요청</td><td>job_id 반환 · 상태 머신 추적</td></tr>
         <tr><td style="color:#FF8A8E">POST</td><td>/api/v1/nodes/release</td><td>격리 메일 강제 해제</td><td>RBAC 검사 + 감사 로그 필수</td></tr>
         <tr><td style="color:var(--arc)">GET</td><td>/api/v1/health</td><td>4개 Edge 리소스 상태 조회</td><td>CPU · MEM · DISK · QUEUE</td></tr>
-        <tr><td style="color:var(--web)">GET/PUT</td><td>/api/v1/settings/node-endpoints/{node}</td><td>장비 IP·Port 설정 및 실제 TCP 연결 확인 (신규)</td><td>ADMIN 권한 · 감사 로그 · 5초 주기 재확인</td></tr>
+        <tr><td style="color:var(--web)">GET/PUT</td><td>/api/v1/settings/node-endpoints/{node}</td><td>장비 IP·Port·사용 여부 설정 및 실제 TCP 연결 확인 (웹메일 포함 4개 노드)</td><td>ADMIN 권한 · 감사 로그 · 5초 주기 재확인</td></tr>
+        <tr><td style="color:var(--web)">GET/PUT</td><td>/api/v1/settings/privacy</td><td>여정 보관기간·제목 마스킹 설정</td><td>개인정보 처리 정책 · ADMIN 권한</td></tr>
+        <tr><td style="color:var(--arc)">GET</td><td>/api/v1/site</td><td>사이트 식별 정보 조회</td><td>INSIGHT_SITE_NAME/ID · 다중 고객사 배포용</td></tr>
       </tbody>
     </table></div>
   </section>
@@ -456,8 +463,8 @@
     var stations = document.querySelectorAll('#metro .station');
     var fill = document.getElementById('metroFill');
     function play(){
-      if(reduce){ stations.forEach(function(s){s.classList.add('lit')}); fill.style.width='63%'; return; }
-      fill.style.width='63%'; // 3번째 역(MailBreaker 격리)까지 진행
+      if(reduce){ stations.forEach(function(s){s.classList.add('lit')}); fill.style.width='34%'; return; }
+      fill.style.width='34%'; // 2번째 역(MailBreaker 격리)까지 진행 — 그 이후 스팸브레이커·아카이빙은 미도달
       stations.forEach(function(s,i){
         setTimeout(function(){ s.classList.add('lit'); }, 500 + i*650);
       });

@@ -2,7 +2,7 @@
 
 crinity_insight_admin.html 프로토타입의 6개 화면이 요구하는 API 계약을
 Crinity_Insight_구현전환_보완명세.md 기준으로 실제 구현한다. 4대 물리 서버
-(Webmail/SpamBreaker/MailBreaker/Archiving)의 Edge Agent만 시뮬레이션이고
+(Webmail/MailBreaker/SpamBreaker/Archiving — 실제 메일 처리 순서)의 Edge Agent만 시뮬레이션이고
 (simulate.py), 그 외 API·검증·SSE·파일 저장은 실동작이다.
 """
 import asyncio
@@ -19,7 +19,7 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import security, simulate, state
+from . import db, release_adapter, security, simulate, state
 from .validators import validate_sos_path
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent.parent / "frontend"
@@ -33,14 +33,18 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(simulate.journey_spawn_loop()),
         asyncio.create_task(simulate.retention_cleanup_loop()),
         asyncio.create_task(simulate.connectivity_check_loop()),
+        asyncio.create_task(simulate.privacy_retention_loop()),
     ]
-    # 서버 기동 직후에도 화면이 비어있지 않도록 초기 여정 몇 건을 미리 생성
-    for _ in range(6):
-        state.journeys.insert(0, simulate.new_journey())
-    for j in state.journeys:
-        for h in j["hops"]:
-            if h.get("reveal_at"):
-                h["reveal_at"] -= 20  # 즉시 확인 가능하도록 과거로 당김
+    # SQLite에 저장된 이력이 없는 최초 기동일 때만 화면 시연용 여정을 미리 생성한다
+    # (재시작마다 데모 데이터를 덧붙이면 실제로 쌓인 이력과 섞여 버리므로 최초 1회만).
+    if not state.journeys:
+        for _ in range(6):
+            j = simulate.new_journey()
+            state.journeys.insert(0, j)
+            for h in j["hops"]:
+                if h.get("reveal_at"):
+                    h["reveal_at"] -= 20  # 즉시 확인 가능하도록 과거로 당김
+            db.upsert_journey(j)
     yield
     for t in tasks:
         t.cancel()
@@ -58,6 +62,36 @@ async def global_rate_limit(request: Request, call_next):
     return await call_next(request)
 
 
+@app.middleware("http")
+async def no_cache_static(request: Request, call_next):
+    """js/css를 자주 고치는 개발 단계라 브라우저가 예전 버전을 계속 쓰는 것을 막는다.
+
+    Cache-Control 헤더가 없으면 브라우저가 휴리스틱으로 임의 캐싱해 버려서, 서버는
+    이미 고친 파일을 서빙 중인데 브라우저 탭은 새로고침해도 옛 JS를 계속 실행하는
+    현상이 생긴다 — no-cache(검증 후 재사용)로 매번 서버에 변경 여부를 확인하게 한다.
+    """
+    response = await call_next(request)
+    if request.url.path.startswith("/static/") or request.url.path == "/":
+        response.headers["Cache-Control"] = "no-cache"
+    return response
+
+
+# ── 사이트 식별(다중 고객사 배포) — LHAMS의 LHAMS_SITE_NAME/SITE_ID 관례와 동일 ──
+@app.get("/api/v1/site")
+def get_site():
+    return {"name": state.SITE_NAME, "id": state.SITE_ID}
+
+
+@app.get("/api/v1/auth/verify", dependencies=[Depends(security.require_admin_token)])
+def verify_admin_token():
+    """대시보드가 입력란에 붙여넣은 토큰을 즉시 검증할 때 쓰는 가벼운 엔드포인트.
+
+    require_admin_token 의존성이 이미 401을 던지므로, 여기까지 도달했다는 것
+    자체가 토큰이 맞다는 뜻이다 — 본문은 그 사실을 다시 한번 명시하는 용도.
+    """
+    return {"ok": True}
+
+
 # ── 헬스 / 처리량 ────────────────────────────────────────────────────────────
 @app.get("/api/v1/health")
 def get_health():
@@ -69,18 +103,19 @@ def get_hourly_stats():
     return simulate.hourly_snapshot()
 
 
-# ── 장비 연결 설정(IP·Port) — 스팸브레이커/메일브레이커/아카이빙 ─────────────────
+# ── 장비 연결 설정(IP·Port) · 사용 여부 — 웹메일·메일브레이커·스팸브레이커·아카이빙 전체 ──
 _HOST_RE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9.\-]*[A-Za-z0-9])?$")
 
 
 @app.get("/api/v1/settings/node-endpoints")
 def get_node_endpoints():
-    return {"endpoints": state.node_endpoints, "connected": state.node_connected}
+    return {"endpoints": state.node_endpoints, "connected": state.node_connected, "enabled": state.node_enabled}
 
 
 class NodeEndpointReq(BaseModel):
-    host: str
-    port: int
+    host: str = ""
+    port: int | None = None
+    enabled: bool = True
 
 
 @app.put(
@@ -91,17 +126,30 @@ async def put_node_endpoint(node_id: str, req: NodeEndpointReq):
     if node_id not in state.CONFIGURABLE_NODES:
         raise HTTPException(400, f"설정 가능한 노드가 아닙니다: {node_id} (허용: {state.CONFIGURABLE_NODES})")
     host = req.host.strip()
-    if not host or len(host) > 253 or not _HOST_RE.match(host):
-        raise HTTPException(400, "호스트는 IP 또는 도메인 형식(영문·숫자·.·-)만 허용됩니다.")
-    if not (1 <= req.port <= 65535):
-        raise HTTPException(400, "포트는 1~65535 사이여야 합니다.")
-    state.node_endpoints[node_id] = {"host": host, "port": req.port}
+    # 검증 자체를 "사용 여부"에 종속시킨다 — 사용 안 함으로 끈 노드는 형식 검증도
+    # TCP 연결 확인도 건너뛰고 입력값을 그대로 저장한다(나중에 다시 켤 때 재입력 불필요).
+    # 사용으로 켤 때만 IP·Port 형식이 맞아야 하고, 그 즉시 실제 연결도 확인한다.
+    if req.enabled:
+        if not host:
+            raise HTTPException(400, "사용 설정 시 IP·Port를 입력해야 합니다.")
+        if len(host) > 253 or not _HOST_RE.match(host):
+            raise HTTPException(400, "호스트는 IP 또는 도메인 형식(영문·숫자·.·-)만 허용됩니다.")
+        if not req.port or not (1 <= req.port <= 65535):
+            raise HTTPException(400, "포트는 1~65535 사이여야 합니다.")
+    state.node_endpoints[node_id] = {"host": host, "port": req.port if host else None}
     state.persist_node_endpoints()
-    state.audit_append("SETTINGS_NODE_ENDPOINT", f"{node_id} → {host}:{req.port}", "admin.kim", "SUCCESS")
+    state.node_enabled[node_id] = req.enabled
+    state.persist_node_enabled()
+    state.audit_append(
+        "SETTINGS_NODE_ENDPOINT",
+        f"{node_id} → {host or '(미설정)'}:{req.port or '-'} · 사용={'예' if req.enabled else '아니오'}",
+        "admin.kim", "SUCCESS",
+    )
     # 저장 직후 사용자가 바로 결과를 볼 수 있도록 다음 5초 주기를 기다리지 않고 즉시 1회 확인
-    connected = await simulate.check_node_endpoint_now(node_id)
+    connected = await simulate.check_node_endpoint_now(node_id) if (req.enabled and host) else None
+    state.node_connected[node_id] = connected
     simulate.publish_tick()
-    return {"ok": True, "node": node_id, "host": host, "port": req.port, "connected": connected}
+    return {"ok": True, "node": node_id, "host": host, "port": req.port, "enabled": req.enabled, "connected": connected}
 
 
 @app.get("/api/v1/stream")
@@ -165,20 +213,24 @@ class ReleaseReq(BaseModel):
 
 
 @app.post("/api/v1/nodes/release", dependencies=[Depends(security.require_admin_token), Depends(security.rate_limit_mutation)])
-def release_node(req: ReleaseReq):
+async def release_node(req: ReleaseReq):
     j = next((x for x in state.journeys if x["message_id"] == req.message_id), None)
     if not j:
         raise HTTPException(404, "해당 Message-ID의 여정을 찾을 수 없습니다.")
     _, top_state = simulate.resolve_journey(j, time.time())
     if top_state != "QUARANTINED":
         raise HTTPException(400, "격리 상태의 여정만 해제할 수 있습니다.")
-    for h in j["hops"]:
-        if h["status"] == "QUARANTINED":
-            h["status"] = "PASS"
-            h["detail"] = (h.get("detail") or "") + " → 관리자 해제(admin.kim)"
-            break
+    blocked_hop = next(h for h in j["hops"] if h["status"] == "QUARANTINED")
+    # 실제 MailBreaker/SpamBreaker 연동이 확정되기 전까지의 연동 지점(seam) — release_adapter.py 참고
+    ok, adapter_msg = await release_adapter.release_on_device(blocked_hop["node"], req.message_id, blocked_hop.get("detail", ""))
+    if not ok:
+        state.audit_append("RELEASE", req.message_id, "admin.kim", f"FAILED: {adapter_msg}")
+        raise HTTPException(502, f"장비 격리 해제 실패: {adapter_msg}")
+    blocked_hop["status"] = "PASS"
+    blocked_hop["detail"] = (blocked_hop.get("detail") or "") + " → 관리자 해제(admin.kim)"
     j["released"] = True
-    state.audit_append("RELEASE", req.message_id, "admin.kim", "SUCCESS")
+    db.upsert_journey(j)
+    state.audit_append("RELEASE", req.message_id, "admin.kim", f"SUCCESS: {adapter_msg}")
     state.publish("journeys_changed", {"reason": "release"})
     return {"ok": True, "message_id": req.message_id}
 
@@ -197,6 +249,9 @@ async def create_sos_job(req: SosCreateReq):
     unknown = [n for n in req.nodes if n not in state.NODE_IDS]
     if unknown:
         raise HTTPException(400, f"알 수 없는 노드: {unknown}")
+    disabled = [n for n in req.nodes if not state.node_enabled.get(n, True)]
+    if disabled:
+        raise HTTPException(400, f"사용 안 함으로 표시된 노드는 SOS 대상으로 선택할 수 없습니다: {disabled}")
     used_gb = simulate.sos_dir_usage_gb()
     if used_gb >= state.sos_settings["max_gb"]:
         raise HTTPException(
@@ -360,6 +415,28 @@ def test_webhook():
     return {"ok": True, "channel": ch}
 
 
+# ── 개인정보 처리 설정(리스크 체크리스트 "개인정보 처리 검토") ───────────────────
+@app.get("/api/v1/settings/privacy")
+def get_privacy_settings():
+    return state.privacy_settings
+
+
+class PrivacySettingsReq(BaseModel):
+    journey_retention_days: int
+    mask_subject: bool
+
+
+@app.put("/api/v1/settings/privacy", dependencies=[Depends(security.require_admin_token), Depends(security.rate_limit_mutation)])
+def put_privacy_settings(req: PrivacySettingsReq):
+    if not (1 <= req.journey_retention_days <= 3650):
+        raise HTTPException(400, "보관 기간은 1~3650일 사이여야 합니다.")
+    state.privacy_settings = {"journey_retention_days": req.journey_retention_days, "mask_subject": req.mask_subject}
+    state.persist_privacy_settings()
+    state.audit_append("SETTINGS_PRIVACY", json.dumps(state.privacy_settings, ensure_ascii=False), "admin.kim", "SUCCESS")
+    state.publish("journeys_changed", {"reason": "privacy_settings"})
+    return state.privacy_settings
+
+
 # ── 감사 로그(NFR-08) ────────────────────────────────────────────────────────
 @app.get("/api/v1/audit")
 def get_audit(limit: int = 30):
@@ -369,7 +446,9 @@ def get_audit(limit: int = 30):
 # ── 정적 프론트엔드 서빙 ─────────────────────────────────────────────────────
 @app.get("/")
 def index():
-    return FileResponse(FRONTEND_DIR / "index.html")
+    # .jsp 확장자는 Python mimetypes에 없어 media_type을 명시하지 않으면
+    # application/octet-stream으로 내려가 브라우저가 다운로드를 시도한다 — 명시 필수.
+    return FileResponse(FRONTEND_DIR / "index.jsp", media_type="text/html; charset=utf-8")
 
 
 app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")

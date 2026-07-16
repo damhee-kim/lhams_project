@@ -319,74 +319,81 @@ table.alert-table td.mono{font-size:11.5px}
  * 목업 데이터. 필드명·구조는 설계서 §4.3 데이터 스키마와 1:1 — 실구현 시
  * 이 상수들을 fetch 응답으로 치환하면 렌더 계층은 수정 없이 동작한다.
  * MOCK: 전부 하드코딩 / REAL: GET /api/v1/journeys, /health, /alerts */
-/* host를 하드코딩하지 않는다 — 스팸브레이커/메일브레이커/아카이빙은 고객사마다
- * 실제 IP·Port가 다르므로 §3-1 "장비 연결 설정" 카드에서 관리자가 직접 입력한다.
- * 실구현: insight/backend/app/state.py의 node_endpoints (host="", port=null 기본값). */
+/* host를 하드코딩하지 않는다 — 웹메일 포함 4개 노드 전부 고객사마다 실제
+ * IP·Port가 다르고, 도입하지 않은 솔루션도 있을 수 있어 "사용 여부" 토글도
+ * 함께 지원한다 (§3-1 "장비 연결 설정" 카드). 실구현: insight/backend/app/
+ * state.py의 node_endpoints·node_enabled (host="", port=null 기본값). */
 const NODES = [
-  {id:"Webmail",     name:"웹메일",     host:"127.0.0.1 (로컬)", color:"var(--webmail)", hex:"#4C8DFF"},
-  {id:"SpamBreaker", name:"스팸브레이커", host:"미설정",           color:"var(--spam)",    hex:"#F7B32B"},
-  {id:"MailBreaker", name:"메일브레이커", host:"미설정",           color:"var(--mailbrk)", hex:"#FF5D5D"},
-  {id:"Archiving",   name:"아카이빙",   host:"미설정",             color:"var(--archive)", hex:"#35C98E"},
+  {id:"Webmail",     name:"웹메일",     host:"미설정", color:"var(--webmail)", hex:"#4C8DFF"},
+  {id:"MailBreaker", name:"메일브레이커", host:"미설정", color:"var(--mailbrk)", hex:"#FF5D5D"},
+  {id:"SpamBreaker", name:"스팸브레이커", host:"미설정", color:"var(--spam)",    hex:"#F7B32B"},
+  {id:"Archiving",   name:"아카이빙",   host:"미설정", color:"var(--archive)", hex:"#35C98E"},
 ];
 const nodeById = id => NODES.find(n=>n.id===id);
-const CONFIGURABLE_NODES = ["SpamBreaker","MailBreaker","Archiving"];
+const CONFIGURABLE_NODES = ["Webmail","MailBreaker","SpamBreaker","Archiving"];
 let nodeEndpoints = Object.fromEntries(CONFIGURABLE_NODES.map(id=>[id,{host:'',port:''}]));
-let nodeConnected = {Webmail:true, SpamBreaker:null, MailBreaker:null, Archiving:null};
+let nodeConnected = Object.fromEntries(CONFIGURABLE_NODES.map(id=>[id,null]));
+let nodeEnabled = Object.fromEntries(CONFIGURABLE_NODES.map(id=>[id,true]));
 
 let health = {
   Webmail:     {cpu:23, mem:61, disk:72, queue:12},
-  SpamBreaker: {cpu:41, mem:55, disk:68, queue:1024},
   MailBreaker: {cpu:37, mem:70, disk:91, queue:88},
+  SpamBreaker: {cpu:41, mem:55, disk:68, queue:1024},
   Archiving:   {cpu:12, mem:48, disk:83, queue:5},
 };
 
+/* 노드 순서는 실제 메일 처리 순서(Webmail → MailBreaker → SpamBreaker → Archiving)를 따른다 —
+ * MailBreaker(DLP)가 SpamBreaker(스팸 필터)보다 먼저이므로, MailBreaker에서 막히면 SpamBreaker는
+ * 아예 도달하지 못한 PENDING으로 표시된다. */
 const JOURNEYS = [
  {message_id:"<20260713.143005.a1@crinity.com>", meta:{sender:"client@external.com", recipient:"user@crinity.com", subject:"프로젝트 산출물 전달의 건", received_at:"2026-07-13 14:30:00"},
   state:"QUARANTINED",
   nodes:[
    {node:"Webmail",status:"PASS",time:"14:30:01",latency:0,detail:"SMTP 250 OK"},
-   {node:"SpamBreaker",status:"PASS",time:"14:30:03",latency:2000,detail:"Spam Score: 0.1"},
-   {node:"MailBreaker",status:"QUARANTINED",time:"14:30:05",latency:2000,detail:"DLP 룰 매칭 — 주민등록번호 패턴 검출"},
+   {node:"MailBreaker",status:"QUARANTINED",time:"14:30:03",latency:2000,detail:"DLP 룰 매칭 — 주민등록번호 패턴 검출"},
+   {node:"SpamBreaker",status:"PENDING"},
    {node:"Archiving",status:"PENDING"}]},
  {message_id:"<20260713.141812.b7@crinity.com>", meta:{sender:"partner@vendor.co.kr", recipient:"sales@crinity.com", subject:"7월 정기 견적서 송부", received_at:"2026-07-13 14:18:10"},
   state:"ARCHIVED",
   nodes:[
    {node:"Webmail",status:"PASS",time:"14:18:11",latency:0,detail:"SMTP 250 OK"},
-   {node:"SpamBreaker",status:"PASS",time:"14:18:12",latency:1000,detail:"Spam Score: 0.0"},
-   {node:"MailBreaker",status:"PASS",time:"14:18:13",latency:1000,detail:"DLP 정책 통과"},
+   {node:"MailBreaker",status:"PASS",time:"14:18:12",latency:1000,detail:"DLP 정책 통과"},
+   {node:"SpamBreaker",status:"PASS",time:"14:18:13",latency:1000,detail:"Spam Score: 0.0"},
    {node:"Archiving",status:"PASS",time:"14:18:14",latency:1000,detail:"WORM 스토리지 보관 완료"}]},
  {message_id:"<20260713.135944.c2@crinity.com>", meta:{sender:"promo@unknown-shop.biz", recipient:"user@crinity.com", subject:"(광고) 최대 90% 특가 이벤트", received_at:"2026-07-13 13:59:40"},
   state:"QUARANTINED",
   nodes:[
    {node:"Webmail",status:"PASS",time:"13:59:41",latency:0,detail:"SMTP 250 OK"},
+   {node:"MailBreaker",status:"PASS",time:"13:59:42",latency:1000,detail:"DLP 정책 통과"},
    {node:"SpamBreaker",status:"QUARANTINED",time:"13:59:43",latency:2000,detail:"Spam Score: 9.8 — RBL 등재 발신 IP"},
-   {node:"MailBreaker",status:"PENDING"},{node:"Archiving",status:"PENDING"}]},
+   {node:"Archiving",status:"PENDING"}]},
  {message_id:"<20260713.133150.d9@crinity.com>", meta:{sender:"hr@crinity.com", recipient:"all@crinity.com", subject:"[전사공지] 하반기 워크숍 일정조사", received_at:"2026-07-13 13:31:48"},
   state:"DELAYED",
   nodes:[
    {node:"Webmail",status:"PASS",time:"13:31:49",latency:0,detail:"SMTP 250 OK"},
+   {node:"MailBreaker",status:"PASS",time:"13:31:50",latency:1000,detail:"DLP 정책 통과"},
    {node:"SpamBreaker",status:"DELAYED",time:"13:31:51",latency:2000,detail:"대기열 정체 감지 — Timeout 엔진 처리 지연 (대기 1,024건)"},
-   {node:"MailBreaker",status:"PENDING"},{node:"Archiving",status:"PENDING"}]},
+   {node:"Archiving",status:"PENDING"}]},
  {message_id:"<20260713.131022.e4@crinity.com>", meta:{sender:"dev@opensource.org", recipient:"cto@crinity.com", subject:"Re: 라이선스 검토 요청", received_at:"2026-07-13 13:10:20"},
   state:"ARCHIVED",
   nodes:[
    {node:"Webmail",status:"PASS",time:"13:10:21",latency:0,detail:"SMTP 250 OK"},
-   {node:"SpamBreaker",status:"PASS",time:"13:10:22",latency:1000,detail:"Spam Score: 0.3"},
-   {node:"MailBreaker",status:"PASS",time:"13:10:23",latency:1000,detail:"DLP 정책 통과"},
+   {node:"MailBreaker",status:"PASS",time:"13:10:22",latency:1000,detail:"DLP 정책 통과"},
+   {node:"SpamBreaker",status:"PASS",time:"13:10:23",latency:1000,detail:"Spam Score: 0.3"},
    {node:"Archiving",status:"PASS",time:"13:10:25",latency:2000,detail:"WORM 스토리지 보관 완료"}]},
  {message_id:"<20260713.124533.f6@crinity.com>", meta:{sender:"finance@crinity.com", recipient:"bank@partner.com", subject:"6월 결산 자료 첨부", received_at:"2026-07-13 12:45:30"},
   state:"QUARANTINED",
   nodes:[
    {node:"Webmail",status:"PASS",time:"12:45:31",latency:0,detail:"SMTP 250 OK"},
-   {node:"SpamBreaker",status:"PASS",time:"12:45:32",latency:1000,detail:"Spam Score: 0.0"},
-   {node:"MailBreaker",status:"QUARANTINED",time:"12:45:34",latency:2000,detail:"첨부파일 정책 위반 — 암호화되지 않은 .xlsx 외부 발송"},
+   {node:"MailBreaker",status:"QUARANTINED",time:"12:45:32",latency:2000,detail:"첨부파일 정책 위반 — 암호화되지 않은 .xlsx 외부 발송"},
+   {node:"SpamBreaker",status:"PENDING"},
    {node:"Archiving",status:"PENDING"}]},
  {message_id:"<20260713.121408.g3@crinity.com>", meta:{sender:"support@crinity.com", recipient:"vip@customer.co.kr", subject:"장애 조치 완료 보고", received_at:"2026-07-13 12:14:05"},
   state:"ARCHIVED",
   nodes:[
    {node:"Webmail",status:"PASS",time:"12:14:06",latency:0,detail:"SMTP 250 OK"},
-   {node:"SpamBreaker",status:"PASS",time:"12:14:07",latency:1000,detail:"Spam Score: 0.1"},
-   {node:"MailBreaker",status:"PASS",time:"12:14:08",latency:1000,detail:"DLP 정책 통과"},
+   {node:"MailBreaker",status:"PASS",time:"12:14:07",latency:1000,detail:"DLP 정책 통과"},
+   {node:"SpamBreaker",status:"PASS",time:"12:14:08",latency:1000,detail:"Spam Score: 0.1"},
    {node:"Archiving",status:"PASS",time:"12:14:09",latency:1000,detail:"WORM 스토리지 보관 완료"}]},
 ];
 
@@ -424,7 +431,7 @@ views.overview = () => {
     <div class="card" style="margin-bottom:14px">
       <h3>장비 연결 설정 (IP · Port) — 통신 여부에 따라 관리자가 직접 설정 (신규)</h3>
       <div id="nodeEndpointRows" style="display:flex;flex-direction:column;gap:10px"></div>
-      <div class="hint" style="margin-top:10px">스팸브레이커·메일브레이커·아카이빙은 고객사마다 실제 장비의 IP·Port가 다르므로 하드코딩하지 않고 직접 입력합니다. 실구현에서는 저장 시 서버가 그 주소로 실제 TCP 연결을 시도해 통신 가능 여부를 판정합니다(insight/backend). 이 목업에서는 저장 버튼 클릭 시 연결 시도를 <b>랜덤 시뮬레이션</b>합니다. 웹메일은 이 서버 자신이므로 설정이 필요 없습니다.</div>
+      <div class="hint" style="margin-top:10px">웹메일·메일브레이커·스팸브레이커·아카이빙 4개 노드 모두 고객사마다 실제 장비의 IP·Port가 다르므로 하드코딩하지 않고 직접 입력합니다. 실구현에서는 저장 시 서버가 그 주소로 실제 TCP 연결을 시도해 통신 가능 여부를 판정합니다(insight/backend). 이 목업에서는 저장 버튼 클릭 시 연결 시도를 <b>랜덤 시뮬레이션</b>합니다. 도입하지 않은 솔루션은 좌측 체크박스로 "사용 안 함" 처리하면 관제·SOS·경보·여정 파이프라인에서 제외됩니다.</div>
     </div>
     <div class="grid4" id="healthCards"></div>
     <div class="grid2 section-gap">
@@ -456,23 +463,38 @@ function renderNodeEndpointRows(){
     const n = nodeById(nid);
     const ep = nodeEndpoints[nid];
     const c = nodeConnected[nid];
-    const badge = !ep.host ? '<span class="chip pending">미설정</span>'
+    const enabled = nodeEnabled[nid] !== false;
+    const badge = !enabled ? '<span class="chip pending">사용 안 함</span>'
+                : !ep.host ? '<span class="chip pending">미설정</span>'
                 : c===true ? '<span class="chip pass">연결됨</span>'
                 : c===false ? '<span class="chip crit">연결 끊김</span>'
                 : '<span class="chip pending">확인 중</span>';
     const row = el('div');
-    row.style.cssText = 'display:grid;grid-template-columns:130px 1fr 100px auto auto;gap:10px;align-items:center';
+    row.style.cssText = 'display:grid;grid-template-columns:150px 1fr 100px auto auto;gap:10px;align-items:center'+(enabled?'':';opacity:.55');
     row.innerHTML = `
-      <div style="font-weight:700;font-size:13px"><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${n.hex};margin-right:7px"></i>${n.name}</div>
-      <input data-f="host" value="${ep.host}" placeholder="IP 또는 호스트명을 입력하세요 (예: 10.10.1.12)" spellcheck="false"
+      <label style="font-weight:700;font-size:13px;cursor:pointer"><input type="checkbox" data-f="enabled" ${enabled?'checked':''} style="margin-right:8px;vertical-align:-2px">
+        <i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${n.hex};margin-right:7px"></i>${n.name}</label>
+      <input data-f="host" value="${ep.host}" placeholder="IP 또는 호스트명을 입력하세요 (예: 10.10.1.12)" spellcheck="false" ${enabled?'':'disabled'}
         style="background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-family:var(--mono);font-size:12px">
-      <input data-f="port" type="number" min="1" max="65535" value="${ep.port}" placeholder="Port"
+      <input data-f="port" type="number" min="1" max="65535" value="${ep.port}" placeholder="Port" ${enabled?'':'disabled'}
         style="background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-family:var(--mono);font-size:12px">
       <span data-badge>${badge}</span>
       <button class="btn ghost" data-save>저장 · 연결 확인</button>`;
+    row.querySelector('[data-f="enabled"]').onchange = e=>{
+      row.querySelector('[data-f="host"]').disabled = !e.target.checked;
+      row.querySelector('[data-f="port"]').disabled = !e.target.checked;
+    };
     row.querySelector('[data-save]').onclick = ()=>{
+      const enabledNow = row.querySelector('[data-f="enabled"]').checked;
       const host = row.querySelector('[data-f="host"]').value.trim();
       const port = row.querySelector('[data-f="port"]').value;
+      nodeEnabled[nid] = enabledNow;
+      if(!enabledNow){
+        nodeConnected[nid] = null;
+        renderNodeEndpointRows(); renderHealth();
+        toast(`${n.name} 사용 안 함으로 설정됨 → 관제 현황·SOS·경보 평가에서 제외`, 'ok');
+        return;
+      }
       if(!host || !port){ toast('IP·Port를 모두 입력하세요.','err'); return; }
       nodeEndpoints[nid] = {host, port};
       nodeConnected[nid] = null;
@@ -492,7 +514,8 @@ function renderNodeEndpointRows(){
 
 function renderHealth(){
   const wrap = $('#healthCards'); if(!wrap) return;
-  wrap.replaceChildren(...NODES.map(n=>{
+  const shown = NODES.filter(n => nodeEnabled[n.id] !== false);
+  wrap.replaceChildren(...shown.map(n=>{
     const h = health[n.id];
     const disconnected = CONFIGURABLE_NODES.includes(n.id) && nodeConnected[n.id]===false;
     const cls = p => p>=90?'hot':p>=80?'warm':'';
@@ -1012,8 +1035,12 @@ views.dev = () => {
           ${trow(['8초 후 데모 경보 (§9)','경보 SSE 스트림 구독','보안명세 §4'])}
           ${trow(['SOS 저장 설정 = 세션 메모리 (§5)','<span class="mono">PUT /settings/sos-storage</span> — 서버측 경로·쓰기·여유공간 검증 + ADMIN 권한 + 감사 기록','보안명세 §3.4'])}
           ${trow(['장비 IP·Port 저장 · 연결 확인 랜덤(70%) 시뮬레이션 (§3-1, 신규)','<span class="mono">PUT /settings/node-endpoints/{node}</span> — 서버가 실제 TCP 연결(asyncio.open_connection)로 판정, 끊김/복구 시 경보 기록','보안명세 §1 확장 · insight/backend/app/simulate.py'])}
+          ${trow(['여정/경보/설정 = 세션 메모리 전부 (§1, 신규)','SQLite 1개 파일(insight.db) 영속화 — 별도 DB 서버·포트 불필요(고객사 DB 고정 제약 대응)','insight/backend/app/db.py · README "DB 선정"'])}
+          ${trow(['격리 해제 실제 장비 반영 (§4, 신규)','실제 MailBreaker/SpamBreaker 인터페이스 미확정 — release_adapter.py가 유일한 연동 지점','insight/backend/app/release_adapter.py'])}
+          ${trow(['SOS 로그 원본 실장비 수집 (§5, 신규)','트리거 방식(push/pull)·인증·진행 보고 형식 등 5가지 미확정 — sos_agent_adapter.py가 유일한 연동 지점','insight/backend/app/sos_agent_adapter.py · README "구현 전환 계획"'])}
         </tbody>
       </table>
+      <div class="hint" style="margin-top:10px">격리 해제·SOS 실행 두 기능 모두 연동 지점(seam)은 이미 코드에 준비돼 있고, 남은 건 벤더/실장비 확인 후 해당 어댑터 함수 본문만 교체하는 것입니다 — README "구현 전환 계획 — 격리 해제 · SOS 실행" 참고.</div>
     </div>
 
     <div class="grid2 section-gap">
@@ -1028,7 +1055,8 @@ views.dev = () => {
  ├─ hooks/          usePolling(3s) · useSse(job/alerts)
  ├─ auth/           RBAC 가드 (FR-11 → 서버 검증과 병행)
  └─ styles/         tokens.css  ← 본 파일 :root 변수 그대로 이관</pre>
-        <div class="hint">CSS 변수(--webmail 등 4색 노드 팔레트)의 색상 체계는 디자인 토큰으로 그대로 이관합니다.</div>
+        <div class="hint">CSS 변수(--webmail 등 4색 노드 팔레트)의 색상 체계는 디자인 토큰으로 그대로 이관합니다.<br>
+        실구현(insight/frontend)은 이미 이 방향으로 한 걸음 옮겨져 있습니다 — 마크업은 <span class="mono">index.jsp</span>(고객사 Tomcat WAS 배포 대비), 화면별 로직은 <span class="mono">js/view-*.js</span> 파일로, 스타일은 <span class="mono">scss/</span> 파티션으로 분리되어 있어 이 표의 각 폴더가 실제로 존재합니다.</div>
       </div>
       <div class="card">
         <h3>데이터 계약 (여정 문서 — 설계서 §4.3)</h3>

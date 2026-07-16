@@ -18,4 +18,15 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 input,select{font:inherit;color:var(--text)}
 ::selection{background:rgba(76,141,255,.35)}
 
+// 다크 테마 스크롤바 — body 전체 스크롤을 포함해 모든 스크롤 영역에 일괄 적용
+*{
+  scrollbar-width:thin;
+  scrollbar-color:var(--line) transparent;
+}
+*::-webkit-scrollbar{width:8px;height:8px}
+*::-webkit-scrollbar-track{background:transparent}
+*::-webkit-scrollbar-thumb{background:var(--line);border-radius:8px}
+*::-webkit-scrollbar-thumb:hover{background:var(--dim)}
+*::-webkit-scrollbar-corner{background:transparent}
+
 @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}

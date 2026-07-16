@@ -3,6 +3,7 @@
 .sidebar{
   width:224px;flex-shrink:0;background:var(--panel2);border-right:1px solid var(--line-soft);
   display:flex;flex-direction:column;padding:20px 0;position:sticky;top:0;height:100vh;
+  overflow-y:auto; // 토큰 가이드 박스 등으로 내용이 뷰포트보다 길어지면 잘리지 않고 스크롤되게
 }
 .logo{
   padding:4px 20px 22px;border-bottom:1px solid var(--line-soft);
@@ -22,6 +23,30 @@
 .side-foot{
   margin-top:auto;padding:14px 20px;border-top:1px solid var(--line-soft);font-size:11.5px;color:var(--dim);line-height:1.7;
   .role{display:inline-block;padding:2px 8px;border-radius:20px;background:rgba(53,201,142,.12);color:var(--archive);font-weight:700;font-size:11px}
+}
+.token-label-row{display:flex;align-items:center;gap:5px;margin-bottom:4px}
+.token-help-btn{
+  width:15px;height:15px;border-radius:50%;background:var(--panel);border:1px solid var(--line);
+  color:var(--muted);font-size:10px;line-height:1;cursor:pointer;flex-shrink:0;
+  &:hover{background:rgba(76,141,255,.15);color:var(--webmail);border-color:var(--webmail)}
+}
+.token-input-row{display:flex;gap:6px;align-items:center}
+.token-status{font-size:12px;width:14px;text-align:center;flex-shrink:0}
+.token-status.ok{color:var(--pass)}
+.token-status.bad{color:var(--crit)}
+.token-help-box{
+  display:none;margin-top:8px;padding:10px 11px;border-radius:8px;background:var(--panel);
+  border:1px solid var(--line);font-size:11px;line-height:1.6;color:var(--muted);
+  box-sizing:border-box;max-width:100%;overflow-wrap:anywhere;
+  &.show{display:block}
+  ol{margin:0;padding-left:15px;display:flex;flex-direction:column;gap:7px}
+  li{padding-left:1px}
+  b{color:var(--text);font-weight:700}
+  code{
+    display:block;width:100%;box-sizing:border-box;margin-top:4px;padding:3px 6px;
+    border-radius:4px;background:rgba(255,255,255,.05);font-family:var(--mono);
+    color:var(--text);font-size:9.5px;line-height:1.5;word-break:break-all;white-space:normal;
+  }
 }
 
 .main{flex:1;min-width:0;display:flex;flex-direction:column}
